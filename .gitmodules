@@ -1,0 +1,6 @@
+[submodule "server/tdx"]
+	path = server/tdx
+	url = https://github.com/hyker/tdx.git
+[submodule "server/payload/custodes/tools/checksec"]
+	path = server/payload/custodes/tools/checksec
+	url = https://github.com/slimm609/checksec.git

@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTE Client</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #222;
+        }
+
+        .section {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .section.hidden {
+            display: none;
+        }
+
+        .section.completed {
+            opacity: 0.6;
+        }
+
+        .section.completed .section-title::after {
+            content: ' ✓';
+            color: #2a9d8f;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 16px;
+        }
+
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 32px 20px;
+            text-align: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: #2a9d8f;
+            background: #f8fffe;
+        }
+
+        .drop-zone-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 12px;
+            color: #2a9d8f;
+        }
+
+        .drop-zone-text {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .drop-zone-or {
+            font-size: 13px;
+            color: #888;
+            margin: 8px 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: #2a9d8f;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #238b7e;
+        }
+
+        .btn-primary:disabled {
+            background: #b0d4cf;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .btn-secondary:hover {
+            background: #dee2e6;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-list {
+            margin-top: 16px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+
+        .file-item-icon {
+            color: #6c757d;
+            flex-shrink: 0;
+        }
+
+        .file-item-name {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-item-size {
+            font-size: 13px;
+            color: #888;
+            margin-left: 8px;
+        }
+
+        .file-item-remove {
+            background: none;
+            border: none;
+            color: #adb5bd;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .file-item-remove:hover {
+            color: #dc3545;
+            background: #fee;
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #2a9d8f;
+        }
+
+        .text-input::placeholder {
+            color: #aaa;
+        }
+
+        textarea.text-input {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .helper-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .link {
+            color: #2a9d8f;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .link:hover {
+            text-decoration: underline;
+        }
+
+        .result-box {
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .result-box.pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .result-box.fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .result-box.loading {
+            background: #e9ecef;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+
+        .job-id-box {
+            background: linear-gradient(135deg, #2a9d8f 0%, #238b7e 100%);
+            color: #fff;
+            padding: 32px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .job-id-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.9;
+            margin-bottom: 12px;
+        }
+
+        .job-id-value {
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            word-break: break-all;
+        }
+
+        .error-box {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #888;
+        }
+
+        .status.success {
+            color: #2a9d8f;
+        }
+
+        .status.error {
+            color: #dc3545;
+        }
+
+        .action-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .divider {
+            height: 1px;
+            background: #e9ecef;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 12px;
+            }
+            .section {
+                padding: 16px;
+            }
+            .job-id-value {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>RTE Client</h1>
+        </div>
+
+        <!-- CRL info box (shown instead of steps 1 & 2 when CRL is pre-fetched by VM) -->
+        <div class="section hidden" id="crlInfo">
+            <div class="section-title">Steps 1 & 2: Download & Upload CRL (automated)</div>
+            <p style="font-size: 14px; color: #555; margin-bottom: 12px;">CRL pre-fetched automatically by the verification service.</p>
+            <div style="font-size: 13px; color: #555; line-height: 1.8;">
+                <div>Last Update: <span id="crlDate" style="font-family: monospace;">—</span></div>
+                <div>SHA-256: <span id="crlDigest" style="font-family: monospace; word-break: break-all;">computing…</span></div>
+            </div>
+        </div>
+
+        <!-- Step 1: Download CRL -->
+        <div class="section" id="step1">
+            <div class="section-title">Step 1: Download CRL</div>
+            <p style="margin-bottom: 12px; font-size: 14px; color: #555;">
+                Download the Intel Platform CRL file required for verification.
+            </p>
+            <a href="https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der"
+               download="pckcrl.der"
+               class="btn btn-secondary"
+               id="downloadCrlBtn">
+                <svg style="width:16px;height:16px;vertical-align:middle;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download CRL File
+            </a>
+        </div>
+
+        <!-- Step 2: Upload CRL -->
+        <div class="section hidden" id="step2">
+            <div class="section-title">Step 2: Upload CRL</div>
+            <div class="drop-zone" id="crlDropZone" onclick="document.getElementById('crlFile').click()">
+                <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 16V4m0 0L8 8m4-4l4 4"/>
+                    <path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/>
+                    <path d="M7 10a5 5 0 019.9-1H18a4 4 0 010 8h-1"/>
+                </svg>
+                <div class="drop-zone-text">Drag & Drop</div>
+                <div class="drop-zone-or">or</div>
+                <span class="btn btn-primary">Choose File</span>
+                <div class="helper-text" style="margin-top: 12px;">CRL file (.der)</div>
+            </div>
+            <input type="file" id="crlFile" class="file-input">
+            <div class="file-list" id="crlFileList"></div>
+        </div>
+
+        <!-- Step 3: Verify Quote -->
+        <div class="section hidden" id="step3">
+            <div class="section-title">Step 3: Verify Quote</div>
+            <p style="margin-bottom: 16px; font-size: 14px; color: #555;">
+                Fetch and verify the TDX quote from the service. The expected RTMR2 will be queried automatically.
+            </p>
+            <button id="verifyButton" class="btn btn-primary" onclick="fetchAndVerifyQuote()">
+                Fetch & Verify Quote
+            </button>
+            <div style="margin-top: 16px;">
+                <div id="output"></div>
+            </div>
+        </div>
+
+        <!-- Step 4: Upload Test Job -->
+        <div class="section hidden" id="step4">
+            <div class="section-title">Step 4: Upload Test Job</div>
+
+            <div id="testConfigSection">
+                <label style="font-size: 13px; color: #555; display: block; margin-bottom: 8px;">
+                    Test Configuration (JSON)
+                </label>
+                <textarea id="testConfig"
+                          class="text-input"
+                          placeholder='{"tool_name": "cppcheck", "parameters": []}'>{"tool_name": "cppcheck", "parameters": []}</textarea>
+                <div class="divider"></div>
+            </div>
+
+            <label style="font-size: 13px; color: #555; display: block; margin-bottom: 12px;">
+                TOE File (Target of Evaluation)
+            </label>
+            <div class="drop-zone" id="toeDropZone" onclick="document.getElementById('toeFile').click()">
+                <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 16V4m0 0L8 8m4-4l4 4"/>
+                    <path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/>
+                    <path d="M7 10a5 5 0 019.9-1H18a4 4 0 010 8h-1"/>
+                </svg>
+                <div class="drop-zone-text">Drag & Drop</div>
+                <div class="drop-zone-or">or</div>
+                <span class="btn btn-primary">Choose File</span>
+                <div class="helper-text" style="margin-top: 12px;">Maximum file size 10Mb</div>
+            </div>
+            <input type="file" id="toeFile" class="file-input">
+            <div class="file-list" id="toeFileList"></div>
+
+            <div class="action-row">
+                <button id="uploadButton" class="btn btn-primary" onclick="uploadTestJob()" disabled>
+                    Upload Test Job
+                </button>
+                <span id="uploadStatus" class="status"></span>
+            </div>
+
+            <div style="margin-top: 16px;">
+                <div id="uploadOutput"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="crl.js"></script>
+    <script>
+        // Step progression
+        window.currentStep = 1;
+
+        function showStep(stepNum) {
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById('step' + i);
+                // Always hide steps 1 & 2 when CRL is pre-fetched
+                if (window.EMBEDDED_CRL && (i === 1 || i === 2)) {
+                    el.classList.add('hidden');
+                    continue;
+                }
+                if (i < stepNum) {
+                    el.classList.remove('hidden');
+                    el.classList.add('completed');
+                } else if (i === stepNum) {
+                    el.classList.remove('hidden');
+                    el.classList.remove('completed');
+                } else {
+                    el.classList.add('hidden');
+                    el.classList.remove('completed');
+                }
+            }
+            window.currentStep = stepNum;
+        }
+
+        function advanceToStep(stepNum) {
+            if (stepNum > window.currentStep) {
+                showStep(stepNum);
+            }
+        }
+
+        // Track CRL download click
+        document.getElementById('downloadCrlBtn').addEventListener('click', function() {
+            // Small delay to allow download to start
+            setTimeout(() => advanceToStep(2), 500);
+        });
+
+        // Drag and drop functionality
+        function setupDropZone(dropZoneId, fileInputId, fileListId, onFileSelected) {
+            const dropZone = document.getElementById(dropZoneId);
+            const fileInput = document.getElementById(fileInputId);
+            const fileList = document.getElementById(fileListId);
+
+            ['dragenter', 'dragover'].forEach(event => {
+                dropZone.addEventListener(event, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('drag-over');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(event => {
+                dropZone.addEventListener(event, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('drag-over');
+                });
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    updateFileList(fileInput, fileList);
+                    if (onFileSelected) onFileSelected();
+                }
+            });
+
+            fileInput.addEventListener('change', () => {
+                updateFileList(fileInput, fileList);
+                if (onFileSelected) onFileSelected();
+            });
+        }
+
+        function updateFileList(fileInput, fileList) {
+            fileList.innerHTML = '';
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const size = formatFileSize(file.size);
+                fileList.innerHTML = `
+                    <div class="file-item">
+                        <svg class="file-item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                        </svg>
+                        <span class="file-item-name">${file.name}</span>
+                        <span class="file-item-size">${size}</span>
+                        <button class="file-item-remove" onclick="clearFile('${fileInput.id}', '${fileList.id}')" title="Remove file">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function clearFile(inputId, listId) {
+            document.getElementById(inputId).value = '';
+            document.getElementById(listId).innerHTML = '';
+            event.stopPropagation();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Initialize drop zones with callbacks
+        setupDropZone('crlDropZone', 'crlFile', 'crlFileList', () => advanceToStep(3));
+        setupDropZone('toeDropZone', 'toeFile', 'toeFileList', () => {
+            document.getElementById('uploadButton').disabled = false;
+        });
+
+        // Pre-populate test config from URL parameter if provided by a parent application
+        const configParam = new URLSearchParams(window.location.search).get('config');
+        if (configParam) {
+            const ta = document.getElementById('testConfig');
+            ta.value = configParam;
+            ta.readOnly = true;
+            ta.style.background = '#f8f9fa';
+            ta.style.color = '#6c757d';
+            ta.style.cursor = 'default';
+        }
+
+        // If the VM has pre-fetched the CRL, show info box instead of steps 1 & 2
+        if (window.EMBEDDED_CRL) {
+            document.getElementById('crlInfo').classList.remove('hidden');
+            if (window.EMBEDDED_CRL_DATE) {
+                document.getElementById('crlDate').textContent = window.EMBEDDED_CRL_DATE;
+            }
+            showStep(3);
+        } else {
+            showStep(1);
+        }
+    </script>
+    <script src="bundle.js"></script>
+</body>
+</html>

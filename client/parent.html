@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Parent Application</title>
+</head>
+<body>
+    <h1>Parent Application</h1>
+    <button onclick="openTOEUploader()">Upload TOE</button>
+    <p>Job ID: <span id="jobId">-</span></p>
+
+    <script>
+        const TEST_CONFIG = {"tool_name": "cppcheck", "parameters": []};
+
+        function openTOEUploader() {
+            const url = 'https://rteverif.xyz:8445/index.html?config=' + encodeURIComponent(JSON.stringify(TEST_CONFIG));
+            window.open(url, 'TOEUploader', 'width=800,height=700');
+        }
+
+        window.addEventListener('message', (event) => {
+            if (event.data?.type === 'TOE_UPLOAD_COMPLETE') {
+                const jobId = event.data.jobId;
+                document.getElementById('jobId').textContent = jobId;
+                console.log('Received jobId:', jobId);
+            }
+        });
+    </script>
+</body>
+</html>

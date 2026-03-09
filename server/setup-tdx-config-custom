@@ -1,0 +1,84 @@
+# This file is part of Canonical's TDX repository which includes tools
+# to setup and configure a confidential computing environment
+# based on Intel TDX technology.
+# See the LICENSE file in the repository for the license text.
+
+# Copyright 2024 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 3,
+# as published by the Free Software Foundation.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranties
+# of MERCHANTABILITY, SATISFACTORY QUALITY, or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+
+################################################################
+# GENERAL                                                      #
+################################################################
+
+################################################################
+# The TDX PPAs to use
+# By default, there is only the release PPA : tdx-release
+# but for development purpose, users can change this list to
+# contain an arbitrary number of PPAs
+# The PPA can be specified in short for full name format:
+#   - short : tdx (in this case, the team will be kobuk-team)
+#   - full : ppa:canonical-kernel-team/bootstrap
+################################################################
+TDX_PPA="tdx-release"
+
+################################################################
+# The TDX PPA for attestation
+################################################################
+TDX_PPA_ATTESTATION=tdx-attestation-release
+
+################################################################
+# Enable the installation of DCAP packages from Canonical's
+# repository. This flag is considered during host OS and guest
+# OS setup.
+# Set to 1 to enable
+# CUSTOM: We enable this to get libtdx-attest for quote generation
+################################################################
+TDX_SETUP_ATTESTATION=1
+
+################################################################
+# Enable the NVIDIA H100
+#
+# Set to 1 to setup necessary components to enable H100 GPU
+# pass-through to TD VM
+################################################################
+TDX_SETUP_NVIDIA_H100=0
+
+################################################################
+# HOST                                                         #
+################################################################
+
+
+################################################################
+# GUEST                                                        #
+################################################################
+
+################################################################
+# Enable the intel optimized kernel for the guest
+# Set to 1 to enable
+# By default, the generic kernel is used
+################################################################
+TDX_SETUP_INTEL_KERNEL=0
+
+################################################################
+# Configure the guest credentials
+################################################################
+GUEST_USER="tdx"
+GUEST_PASSWORD="123456"
+GUEST_HOSTNAME="tdx-guest"
+
+################################################################
+# APPS
+################################################################
+
+################################################################
+# Enable AI Apps in the guest
+################################################################
+TDX_SETUP_APPS_OLLAMA=0

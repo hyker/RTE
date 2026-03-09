@@ -1,0 +1,8 @@
+*.img
+*.raw
+*.qcow2
+verity-dev-image.img.meta
+veritydata.txt
+build.meta
+verity-image.img.meta
+secrets.sh

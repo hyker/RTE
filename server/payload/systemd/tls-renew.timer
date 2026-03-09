@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily TLS certificate renewal check
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=3600
+
+[Install]
+WantedBy=timers.target

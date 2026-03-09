@@ -1,0 +1,13 @@
+[Unit]
+Description=Custodes Security Testing Service
+After=network.target tls-provision.service
+Wants=tls-provision.service
+
+[Service]
+ExecStart=/usr/local/bin/custodes
+WorkingDirectory=/opt/custodes
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
