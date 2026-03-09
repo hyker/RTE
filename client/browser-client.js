@@ -4,7 +4,7 @@ import { fromBase64, toBase64, toText } from './utils.js';
 // Service endpoint
 // NOTE: This uses an insecure HTTPS connection for development.
 // For production, proper certificate validation should be implemented.
-const SERVICE_BASE_URL = 'https://150.140.195.209:8444';
+const SERVICE_BASE_URL = 'https://custodesrte.xyz:8444';
 const QUOTE_SERVICE_URL = `${SERVICE_BASE_URL}/quote`;
 const UPLOAD_SERVICE_URL = `${SERVICE_BASE_URL}/upload`;
 const RTMR2_SERVICE_URL = `${SERVICE_BASE_URL}/rtmr2`;
