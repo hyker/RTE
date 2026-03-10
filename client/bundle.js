@@ -24708,7 +24708,7 @@ nA+TjD1ai5cCICYb1SAmD5xkfTVpvo4UoyiSYxrDWLmUR4CI9NKyfPN+
   };
 
   // browser-client.js
-  var SERVICE_BASE_URL = "https://150.140.195.209:8444";
+  var SERVICE_BASE_URL = "https://custodesrte.xyz:8444";
   var QUOTE_SERVICE_URL = `${SERVICE_BASE_URL}/quote`;
   var UPLOAD_SERVICE_URL = `${SERVICE_BASE_URL}/upload`;
   var RTMR2_SERVICE_URL = `${SERVICE_BASE_URL}/rtmr2`;
