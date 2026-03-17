@@ -1,12 +1,20 @@
 package main
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/crypto/hkdf"
 )
 
 type TOE struct {
@@ -14,22 +22,69 @@ type TOE struct {
 	Base64EncodedTOE string `json:"base64_encoded_toe"`
 }
 
-// RequestPayload represents the complete JSON structure
+// UploadRequestPayload represents the complete JSON structure
 type UploadRequestPayload struct {
-	TOE       TOE   `json:"toe"`
-	Test 			Tool 	`json:"test"`
+	TOE  TOE  `json:"toe"`
+	Test Tool `json:"test"`
 }
 
-// var allowedTools = []string{"cppcheck"}
+// EncryptedUploadRequest is the ECIES envelope sent by the client.
+// The client encrypts the UploadRequestPayload JSON using ECDH (ephemeral P-256 keypair)
+// + HKDF-SHA256 + AES-128-GCM against the attested enclave public key.
+// The GCM auth tag covers the entire payload, binding the TOE and test config together.
+type EncryptedUploadRequest struct {
+	Version         int    `json:"version"`
+	EphemeralPubKey string `json:"ephemeral_public_key"`
+	Nonce           string `json:"nonce"`
+	Ciphertext      string `json:"ciphertext"`
+}
+
+func decryptUploadPayload(req EncryptedUploadRequest) ([]byte, error) {
+	ephPubKeyBytes, _ := base64.StdEncoding.DecodeString(req.EphemeralPubKey)
+	ephPubKey, err := ecdh.P256().NewPublicKey(ephPubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	serverPrivKey, _ := GetECDHPrivateKey()
+	sharedSecret, err := serverPrivKey.ECDH(ephPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	hkdfReader := hkdf.New(sha256.New, sharedSecret, nil, []byte("RTE-upload-encryption-v1"))
+	aesKey := make([]byte, 16)
+	io.ReadFull(hkdfReader, aesKey)
+
+	block, _ := aes.NewCipher(aesKey)
+	gcm, _ := cipher.NewGCM(block)
+
+	nonce, _ := base64.StdEncoding.DecodeString(req.Nonce)
+	ciphertext, _ := base64.StdEncoding.DecodeString(req.Ciphertext)
+
+	return gcm.Open(nil, nonce, ciphertext, nil)
+}
+
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	// working directory
 	toeDir := "/var/tmp/custodes/toes"
 	bodyBytes := readReq(w, r)
 
-	var payload UploadRequestPayload
+	var encReq EncryptedUploadRequest
+	if err := json.Unmarshal(bodyBytes, &encReq); err != nil || encReq.Version != 1 {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	plaintext, err := decryptUploadPayload(encReq)
+	if err != nil {
+		log.Printf("decryptUploadPayload: %v", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	bodyBytes = plaintext
 
+	var payload UploadRequestPayload
 	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
-		http.Error(w, fmt.Sprintf("Error parsing JSON: %v", err), http.StatusBadRequest)
+		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 

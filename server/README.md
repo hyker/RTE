@@ -265,8 +265,10 @@ A `tls-renew.timer` (systemd, daily) runs `tls-renew.sh` once per day. The scrip
 **Key binding and attestation:**
 
 Two independent keys are generated fresh each boot — no pre-baked keys in the image:
-- **Enclave signing keypair**: P256 ECDSA, generated in-memory by custodes at startup, never written to disk. Public key embedded in the TDX quote reportdata field as raw P-256 X‖Y coordinates: 32 bytes X (zero-padded) concatenated with 32 bytes Y (zero-padded), no `0x04` uncompressed-point prefix — 64 bytes total, filling the reportdata field exactly. Used to sign `/result` responses.
+- **Enclave signing keypair**: P256 ECDSA, generated in-memory by custodes at startup, never written to disk. Public key embedded in the TDX quote reportdata field as raw P-256 X‖Y coordinates: 32 bytes X (zero-padded) concatenated with 32 bytes Y (zero-padded), no `0x04` uncompressed-point prefix — 64 bytes total, filling the reportdata field exactly. Used to sign `/result` responses, and also used as the ECDH encryption key for upload payload decryption (see below).
 - **TLS key**: P256 ECDSA, managed by certbot in standard `certonly` mode, written to `/run/custodes/tls/key.pem` (tmpfs, ephemeral). Used only for HTTPS transport. Independent of the signing keypair.
+
+**TODO — key separation:** The enclave signing keypair currently serves a dual purpose: ECDSA signing of `/result` responses, and ECDH decryption of encrypted `/upload` payloads. Using the same key for both signing and key agreement is a cryptographic anti-pattern (separation of concerns). A future iteration should generate two distinct P-256 keypairs at startup — one for signing, one for ECDH — and publish both in the TDX quote reportdata (or an alternative attestation field).
 
 A verifier can confirm via the quote that result signatures belong to this specific attested boot. The attested public key is the enclave signing key — not the TLS key.
 - `LE_DOMAIN`, `LE_EMAIL`, and `LE_STAGING` are baked into the dm-verity image (`/opt/certbot/certbot.env`) and thus covered by RTMR2 — a verifier can confirm which domain is being certified and whether staging was used

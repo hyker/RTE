@@ -1,41 +1,14 @@
 package main
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os/exec"
 	"strconv"
 	"strings"
 )
-
-var signingKey *ecdsa.PrivateKey
-
-func init() {
-	var err error
-	signingKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		log.Fatalf("Failed to generate enclave signing keypair: %v", err)
-	}
-	log.Printf("Generated P256 enclave signing keypair")
-}
-
-// GetPublicKeyHex returns the public key X||Y coordinates as hex (64 bytes = 128 hex chars)
-// Format: raw P-256 coordinates, zero-padded to 32 bytes each, no 0x04 prefix.
-// Used to fit the 64-byte TDX quote reportdata field.
-func GetPublicKeyHex() string {
-	x := signingKey.PublicKey.X.Bytes()
-	y := signingKey.PublicKey.Y.Bytes()
-	coords := make([]byte, 64)
-	copy(coords[32-len(x):32], x)
-	copy(coords[64-len(y):64], y)
-	return hex.EncodeToString(coords)
-}
 
 func rtmr2Handler(w http.ResponseWriter, r *http.Request) {
 	// Get a quote to extract RTMR2 (reportdata doesn't affect RTMRs)

@@ -288,6 +288,46 @@ function showUploadLoading(outputEl, message) {
   outputEl.innerHTML = `<div class="result-box loading">${message}</div>`;
 }
 
+// Encrypt payload bytes using ECIES: ECDH (ephemeral P-256) + HKDF-SHA256 + AES-128-GCM.
+// serverPubKey64: 64-byte Uint8Array, raw X||Y coordinates of the attested enclave public key.
+// Returns the encrypted envelope object ready to JSON-stringify and POST.
+async function encryptPayload(serverPubKey64, plaintextBytes) {
+  const serverKeyBytes = new Uint8Array(65);
+  serverKeyBytes[0] = 0x04;
+  serverKeyBytes.set(serverPubKey64, 1);
+
+  const serverECDHKey = await crypto.subtle.importKey(
+    'raw', serverKeyBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, []
+  );
+
+  const ephPair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+  );
+
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: 'ECDH', public: serverECDHKey }, ephPair.privateKey, 256
+  );
+
+  const hkdfKey = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
+
+  const aesKey = await crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: new TextEncoder().encode('RTE-upload-encryption-v1') },
+    hkdfKey,
+    { name: 'AES-GCM', length: 128 }, false, ['encrypt']
+  );
+
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, plaintextBytes);
+  const ephPubBytes = await crypto.subtle.exportKey('raw', ephPair.publicKey);
+
+  return {
+    version: 1,
+    ephemeral_public_key: toBase64(new Uint8Array(ephPubBytes)),
+    nonce: toBase64(nonce),
+    ciphertext: toBase64(new Uint8Array(ciphertext))
+  };
+}
+
 // Upload test job to the service
 export async function uploadTestJob() {
   const outputEl = document.getElementById('uploadOutput');
@@ -349,14 +389,21 @@ export async function uploadTestJob() {
       }
     };
 
-    // Upload to service
+    // Encrypt payload to the attested enclave public key before sending
+    if (!window.extractedPublicKey) {
+      showUploadError(outputEl, 'Enclave public key not available — quote verification must pass first');
+      return;
+    }
+    const plaintextBytes = new TextEncoder().encode(JSON.stringify(payload));
+    const encryptedBody = await encryptPayload(window.extractedPublicKey, plaintextBytes);
+
     const response = await fetch(UPLOAD_SERVICE_URL, {
       method: 'POST',
       mode: 'cors',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(encryptedBody)
     });
 
     if (!response.ok) {
