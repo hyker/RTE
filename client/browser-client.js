@@ -1,10 +1,8 @@
 import verifyTdxQuote from './tdx-quote-verifier.js';
 import { fromBase64, toBase64, toText } from './utils.js';
 
-// Service endpoint
-// NOTE: This uses an insecure HTTPS connection for development.
-// For production, proper certificate validation should be implemented.
-const SERVICE_BASE_URL = 'https://custodesrte.xyz:8444';
+// Service endpoint — injected at build time by client/vm/build.sh
+const SERVICE_BASE_URL = '__SERVICE_URL__';
 const QUOTE_SERVICE_URL = `${SERVICE_BASE_URL}/quote`;
 const UPLOAD_SERVICE_URL = `${SERVICE_BASE_URL}/upload`;
 const RTMR2_SERVICE_URL = `${SERVICE_BASE_URL}/rtmr2`;

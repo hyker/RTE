@@ -118,19 +118,43 @@ build-base.sh ──> setup-verity.sh ──> boot.sh
    ```
    **Cloudflare DNS requirement:** The domain in `LE_DOMAIN` must be managed by Cloudflare DNS (free plan is sufficient). If the domain was purchased elsewhere (e.g. Namecheap), point its nameservers to Cloudflare's. The API token must be scoped to `Zone → DNS → Edit` for the specific zone — no broader permissions are needed or recommended. The token is only used at boot time to create and delete a DNS TXT record for the Let's Encrypt DNS-01 challenge; it is never written to the image and never stored inside the VM beyond the duration of `tls-provision.service`.
 
-```
-# build base image (bakes LE_DOMAIN, LE_EMAIL, LE_STAGING into the dm-verity image)
-./build-base.sh [--tdx] [--debug]
+### Full build (recommended)
 
-# configure dm-verity
-sudo ./setup-verity.sh          # staging: writes verity-image.img
-sudo ./setup-verity.sh --dev    # dev:     writes verity-dev-image.img
+Use the top-level wrapper script — it runs all steps in the correct order:
 
-# boot VM (TDX support and RAM are read automatically from the .meta file)
-# secrets.sh must exist — CF_API_TOKEN is passed to the VM at boot via QEMU fw_cfg
-./boot.sh --staging  # HTTPS 8444, SSH 2222
-./boot.sh --dev      # HTTPS 9001, SSH 2223
+```bash
+# From the repo root:
+./build.sh --prod|--dev [--tdx] [--debug]
 ```
+
+This runs: `build-base.sh` → `setup-verity.sh` → `record-rtmr2.sh` → `client/vm/build.sh`
+
+### Individual steps (standalone)
+
+The wrapper calls these in sequence. Each can also be run independently if needed.
+All scripts default to dev mode (LE staging) when no mode is given.
+
+```bash
+# 1. Build base image (bakes LE_DOMAIN, LE_EMAIL, LE_STAGING into the dm-verity image)
+./build-base.sh [--prod|--dev] [--tdx] [--debug]
+
+# 2. Configure dm-verity — writes the image and a .meta file with RTMR2= placeholder
+sudo ./setup-verity.sh --prod   # writes verity-image.img
+sudo ./setup-verity.sh --dev    # writes verity-dev-image.img
+
+# 3. Record RTMR2 — boots the VM, queries /rtmr2, writes value into .meta, stops VM
+#    Requires TDX hardware. Skipped automatically if RTMR2 is already set in .meta.
+./record-rtmr2.sh --prod|--dev
+
+# 4. Build client bundle — reads RTMR2 from .meta and injects service URL into bundle.js
+cd client/vm && ./build.sh --prod|--dev
+
+# 5. Boot VM for normal use
+./boot.sh --prod  # HTTPS 8444, SSH 2222
+./boot.sh --dev   # HTTPS 9444, SSH 2223
+```
+
+**RTMR2 and the client bundle:** Step 3 records the expected RTMR2 value into `verity-image.img.meta`. Step 4 reads it and bakes it as a constant into `bundle.js` — the client verifier compares the quote's RTMR2 against this hardcoded value rather than trusting the enclave to report its own. If RTMR2 is not yet set in `.meta` (e.g. non-TDX builds), the check is disabled and a warning is printed during the client build.
 
 `boot.sh` verifies the sha256 of the image against `verity-image.img.meta` before booting, ensuring the image and its metadata are in sync. It also passes the Cloudflare API token to the VM via QEMU `fw_cfg` — the token is never written to the image.
 

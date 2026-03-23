@@ -1,9 +1,9 @@
 #!/bin/bash
 # Kill running verity VMs
-# Usage: ./kill-vm.sh <dev|staging|all>
+# Usage: ./kill-vm.sh <dev|prod|all>
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <dev|staging|all>"
+  echo "Usage: $0 <dev|prod|all>"
   exit 1
 fi
 
@@ -14,16 +14,16 @@ case $MODE in
     pkill -f 'process=verity-dev' && echo "Killed dev VM" || echo "Dev VM not running"
     rm -f verity-dev-overlay.img
     ;;
-  staging)
-    pkill -f 'process=verity-staging' && echo "Killed staging VM" || echo "Staging VM not running"
+  prod)
+    pkill -f 'process=verity-prod' && echo "Killed prod VM" || echo "Prod VM not running"
     ;;
   all)
     pkill -f 'process=verity-dev' && echo "Killed dev VM" || echo "Dev VM not running"
-    pkill -f 'process=verity-staging' && echo "Killed staging VM" || echo "Staging VM not running"
+    pkill -f 'process=verity-prod' && echo "Killed prod VM" || echo "Prod VM not running"
     rm -f verity-dev-overlay.img
     ;;
   *)
-    echo "Usage: $0 [dev|staging|all]"
+    echo "Usage: $0 [dev|prod|all]"
     exit 1
     ;;
 esac

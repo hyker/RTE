@@ -4,8 +4,8 @@ MODE=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --staging)
-      MODE="staging"
+    --prod)
+      MODE="prod"
       shift
       ;;
     --dev)
@@ -14,23 +14,23 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 --staging|--dev"
-      echo "  --staging: Port 8444, SSH 2222 (long-running)"
-      echo "  --dev:     Port 9001, SSH 2223 (quick iteration)"
+      echo "Usage: $0 --prod|--dev"
+      echo "  --prod: Port 8444, SSH 2222 (production image)"
+      echo "  --dev:  Port 9444, SSH 2223 (dev overlay image)"
       exit 1
       ;;
   esac
 done
 
 if [ -z "$MODE" ]; then
-  echo "Error: --staging or --dev required"
-  echo "Usage: $0 --staging|--dev"
+  echo "Error: --prod or --dev required"
+  echo "Usage: $0 --prod|--dev"
   exit 1
 fi
 
 # Derive base image name from mode
 case $MODE in
-  staging)
+  prod)
     BASE_IMAGE="verity-image.img"
     ;;
   dev)
@@ -82,16 +82,16 @@ VM_MEMORY=$VM_MEMORY
 
 # Configure ports and image
 case $MODE in
-  staging)
+  prod)
     HTTPS_PORT=8444
     SSH_PORT=2222
-    VM_NAME="verity-staging"
+    VM_NAME="verity-prod"
     GUEST_CID=6
     DISK_IMAGE="$BASE_IMAGE"
     DISK_OPTS=""
     ;;
   dev)
-    HTTPS_PORT=9001
+    HTTPS_PORT=9444
     SSH_PORT=2223
     VM_NAME="verity-dev"
     GUEST_CID=7
@@ -146,5 +146,5 @@ else
     "${FW_CFG_ARGS[@]}"
 fi
 
-echo "VM started: https://localhost:$HTTPS_PORT (ssh port $SSH_PORT)"
+echo "VM started ($MODE): https://localhost:$HTTPS_PORT (ssh port $SSH_PORT)"
 echo "Stop with: pkill -f 'process=$VM_NAME'"

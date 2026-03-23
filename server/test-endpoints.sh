@@ -1,21 +1,21 @@
 #!/bin/bash
 # Test suite for custodes endpoints
-# Usage: ./test-endpoints.sh <dev|staging>
+# Usage: ./test-endpoints.sh <dev|prod>
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <dev|staging>"
+  echo "Usage: $0 <dev|prod>"
   exit 1
 fi
 
 case $1 in
   dev)
-    PORT=9001
+    PORT=9444
     ;;
-  staging)
+  prod)
     PORT=8444
     ;;
   *)
-    echo "Usage: $0 <dev|staging>"
+    echo "Usage: $0 <dev|prod>"
     exit 1
     ;;
 esac

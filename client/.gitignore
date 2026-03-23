@@ -15,6 +15,7 @@ tmp
 
 # Build
 public/css/main.css
+bundle.js
 
 # Coverage reports
 coverage

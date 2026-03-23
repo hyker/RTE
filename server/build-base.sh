@@ -9,6 +9,7 @@ while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done 2>/dev/null &
 # Parse command line arguments
 USE_TDX=false
 DEBUG_MODE=false
+MODE="dev"
 while [[ $# -gt 0 ]]; do
   case $1 in
     --tdx)
@@ -19,9 +20,19 @@ while [[ $# -gt 0 ]]; do
       DEBUG_MODE=true
       shift
       ;;
+    --prod)
+      MODE="prod"
+      shift
+      ;;
+    --dev)
+      MODE="dev"
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--tdx] [--debug]"
+      echo "Usage: $0 [--prod|--dev] [--tdx] [--debug]"
+      echo "  --prod:  use production LE certs (default is staging)"
+      echo "  --dev:   use LE staging certs (default)"
       echo "  --tdx:   build with TDX support"
       echo "  --debug: enable debug mode (keeps SSH and extra services enabled)"
       exit 1
@@ -29,12 +40,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Load certbot configuration (domain, email, staging flag — baked into image, no secrets)
+# Load certbot configuration (domain, email — baked into image, no secrets)
 if [ ! -f build-config.sh ]; then
-  echo "Error: build-config.sh not found. Create it with LE_DOMAIN, LE_EMAIL, LE_STAGING."
+  echo "Error: build-config.sh not found. Create it with LE_DOMAIN, LE_EMAIL."
   exit 1
 fi
 source build-config.sh
+
+# LE staging by default (safe); only --prod uses production certs
+if [ "$MODE" = "prod" ]; then
+  LE_STAGING="false"
+else
+  LE_STAGING="true"
+fi
 
 # Tmpfs size configuration (overridable via environment variables)
 # Minimum requirements: /tmp=10G (payload storage), /var/log=256M, /var/lib=128M, /var/cache=64M, /var/tmp=2G (dependency-check database)

@@ -5,10 +5,45 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$SCRIPT_DIR"
 
+MODE=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --prod) MODE="prod"; shift ;;
+    --dev)  MODE="dev";  shift ;;
+    *)
+      echo "Usage: $0 --prod|--dev"
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$MODE" ]; then
+  echo "Usage: $0 --prod|--dev"
+  exit 1
+fi
+
 # --- Let's Encrypt via Cloudflare DNS-01 ---
 DOMAIN="rteverif.xyz"
 LE_EMAIL="joakim.brorsson@hyker.se"
-LETSENCRYPT_STAGING="false"
+
+case $MODE in
+  prod)
+    LETSENCRYPT_STAGING="false"
+    DISK="vm-disk-prod.qcow2"
+    SEED="seed-prod.iso"
+    WEBROOT="webroot-prod.iso"
+    SERVER_META="$SCRIPT_DIR/../../server/verity-image.img.meta"
+    SERVICE_URL="https://custodesrte.xyz:8444"
+    ;;
+  dev)
+    LETSENCRYPT_STAGING="true"
+    DISK="vm-disk-dev.qcow2"
+    SEED="seed-dev.iso"
+    WEBROOT="webroot-dev.iso"
+    SERVER_META="$SCRIPT_DIR/../../server/verity-dev-image.img.meta"
+    SERVICE_URL="https://custodesrte.xyz:9444"
+    ;;
+esac
 
 # CF_API_TOKEN is loaded from the untracked file vm/secrets.sh (not committed to git)
 # Create it with: echo 'CF_API_TOKEN="your-token-here"' > vm/secrets.sh
@@ -26,6 +61,24 @@ CLOUD_IMAGE_URL="https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-2
 echo "Building JS bundle..."
 (cd "$PROJECT_DIR" && npm install && npm run build)
 
+# Inject service URL
+sed -i "s|__SERVICE_URL__|$SERVICE_URL|" "$PROJECT_DIR/bundle.js"
+echo "Service URL injected: $SERVICE_URL"
+
+# Inject expected RTMR2 from server image metadata into the bundle.
+# "__RTMR2_SENTINEL__" becomes null if RTMR2 is not recorded yet, disabling the check.
+RTMR2_VALUE=""
+if [ -f "$SERVER_META" ]; then
+  RTMR2_VALUE=$(grep "^RTMR2=" "$SERVER_META" | cut -d= -f2)
+fi
+if [[ "$RTMR2_VALUE" =~ ^[0-9a-fA-F]{96}$ ]]; then
+  sed -i "s/\"__RTMR2_SENTINEL__\"/\"$RTMR2_VALUE\"/" "$PROJECT_DIR/bundle.js"
+  echo "RTMR2 injected: $RTMR2_VALUE"
+else
+  sed -i 's/"__RTMR2_SENTINEL__"/null/' "$PROJECT_DIR/bundle.js"
+  echo "WARNING: RTMR2 not set in $SERVER_META — RTMR2 check disabled in client"
+fi
+
 # Download Ubuntu cloud image if not present
 if [ ! -f "$CLOUD_IMAGE" ]; then
   echo "Downloading Ubuntu 24.04 cloud image..."
@@ -34,8 +87,8 @@ fi
 
 # Create overlay disk (copy-on-write, base image stays clean)
 echo "Creating VM disk overlay..."
-rm -f vm-disk.qcow2
-qemu-img create -f qcow2 -b "$CLOUD_IMAGE" -F qcow2 vm-disk.qcow2 4G
+rm -f "$DISK"
+qemu-img create -f qcow2 -b "$CLOUD_IMAGE" -F qcow2 "$DISK" 4G
 
 # Pack web content into a data ISO
 echo "Creating web content ISO..."
@@ -47,8 +100,8 @@ cp "$PROJECT_DIR"/index.html \
    "$PROJECT_DIR"/tdx-quote-verifier.js \
    "$PROJECT_DIR"/utils.js \
    "$WEBSTAGING"/
-rm -f webroot.iso
-genisoimage -quiet -o webroot.iso -V WEBROOT -r -J "$WEBSTAGING"
+rm -f "$WEBROOT"
+genisoimage -quiet -o "$WEBROOT" -V WEBROOT -r -J "$WEBSTAGING"
 rm -rf "$WEBSTAGING"
 
 # Create cloud-init seed ISO
@@ -288,14 +341,10 @@ instance-id: webserver-vm
 local-hostname: webserver
 METADATA
 
-rm -f seed.iso
-cloud-localds seed.iso /tmp/ci-user-data /tmp/ci-meta-data
+rm -f "$SEED"
+cloud-localds "$SEED" /tmp/ci-user-data /tmp/ci-meta-data
 rm -f /tmp/ci-user-data /tmp/ci-meta-data
 
 echo ""
-echo "Build complete. Files:"
-echo "  vm-disk.qcow2  - VM disk (overlay on cloud image)"
-echo "  seed.iso        - cloud-init configuration"
-echo "  webroot.iso     - web content"
-echo ""
-echo "Run ./boot.sh to start the VM."
+echo "Build complete ($MODE). Files: $DISK, $SEED, $WEBROOT"
+echo "Run: ./boot.sh --$MODE"

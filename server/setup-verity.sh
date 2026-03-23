@@ -2,24 +2,32 @@
 set -e
 
 # Parse arguments
-DEV_MODE=false
+MODE="dev"
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --prod)
+      MODE="prod"
+      shift
+      ;;
     --dev)
-      DEV_MODE=true
+      MODE="dev"
       shift
       ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--dev]"
-      echo "  --dev: write verity-dev-image.img instead of verity-image.img"
+      echo "Usage: $0 [--prod|--dev]"
+      echo "  --prod: write verity-image.img"
+      echo "  --dev:  write verity-dev-image.img (default)"
       exit 1
       ;;
   esac
 done
 
-OUTPUT_IMAGE="verity-image.img"
-[ "$DEV_MODE" = true ] && OUTPUT_IMAGE="verity-dev-image.img"
+if [ "$MODE" = "prod" ]; then
+  OUTPUT_IMAGE="verity-image.img"
+else
+  OUTPUT_IMAGE="verity-dev-image.img"
+fi
 
 # get sudo capabilities for later
 sudo -v
@@ -100,6 +108,7 @@ TDX=$TDX
 DEBUG=$DEBUG
 VM_MEMORY=$VM_MEMORY
 IMAGE_SHA256=$IMAGE_SHA256
+RTMR2=
 EOF
 
 echo "Verity setup complete. Root hash written to veritydata.txt. Image written to $OUTPUT_IMAGE"
