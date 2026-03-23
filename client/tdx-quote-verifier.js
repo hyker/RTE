@@ -430,8 +430,16 @@ async function checkHeader(header) {
 }
 
 
-async function checkBody(body) {
-  //TODO check body contents
+async function checkBody(body, expectedRTMR2) {
+  if (!expectedRTMR2) {
+    return new Error('Expected RTMR2 not set — build pipeline must record RTMR2 before building the client');
+  }
+  const rtmr2Hex = Array.from(body.RTMR2)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  if (rtmr2Hex !== expectedRTMR2.toLowerCase()) {
+    return new Error(`RTMR2 mismatch: expected ${expectedRTMR2}, got ${rtmr2Hex}`);
+  }
 }
 
 async function checkSignature(signature) {
@@ -511,7 +519,8 @@ export default async (
     securityVersion = 0,
     uniqueID,
     signerID,
-    productID
+    productID,
+    expectedRTMR2 = null
   }
 ) => {
   // Parse report
@@ -521,7 +530,7 @@ export default async (
   //check report
   const headerResult = await checkHeader(quote.header);
   if (headerResult instanceof Error) { return headerResult; }
-  const bodyResult = await checkBody(quote.body);
+  const bodyResult = await checkBody(quote.body, expectedRTMR2);
   if (bodyResult instanceof Error) { return bodyResult; }
   const signatureResult = await checkSignature(quote.signature);
   if (signatureResult instanceof Error) { return signatureResult; }

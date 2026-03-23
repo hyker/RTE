@@ -5,7 +5,9 @@ import { fromBase64, toBase64, toText } from './utils.js';
 const SERVICE_BASE_URL = '__SERVICE_URL__';
 const QUOTE_SERVICE_URL = `${SERVICE_BASE_URL}/quote`;
 const UPLOAD_SERVICE_URL = `${SERVICE_BASE_URL}/upload`;
-const RTMR2_SERVICE_URL = `${SERVICE_BASE_URL}/rtmr2`;
+
+// Expected RTMR2 — injected at build time from server .meta file
+const EXPECTED_RTMR2 = "__RTMR2_SENTINEL__";
 
 // Global storage for uploaded CRL — pre-load from VM-fetched CRL if available
 window.uploadedCRL = window.EMBEDDED_CRL
@@ -36,41 +38,6 @@ function toHex(bytes) {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
     .toUpperCase();
-}
-
-// Check if RTMR2 matches expected value
-function checkRTMR2(rtmr2, expectedHex) {
-  if (!rtmr2 || rtmr2.length !== 48) {
-    return {
-      valid: false,
-      message: `Invalid RTMR2 length: ${rtmr2?.length || 0} (expected 48 bytes)`
-    };
-  }
-
-  if (!expectedHex || expectedHex.length !== 96) {
-    return {
-      valid: false,
-      message: `Invalid expected RTMR2 length: ${expectedHex?.length || 0} (expected 96 hex characters)`
-    };
-  }
-
-  const actualHex = toHex(rtmr2);
-  const normalizedExpected = expectedHex.toUpperCase();
-
-  if (actualHex === normalizedExpected) {
-    return {
-      valid: true,
-      message: 'RTMR2 verified successfully',
-      hex: actualHex
-    };
-  }
-
-  return {
-    valid: false,
-    message: 'RTMR2 mismatch',
-    expected: normalizedExpected,
-    actual: actualHex
-  };
 }
 
 // Extract public key from reportData
@@ -104,33 +71,6 @@ async function loadCRL() {
   return new Uint8Array(arrayBuffer);
 }
 
-// Fetch expected RTMR2 from service
-async function fetchExpectedRTMR2() {
-  const response = await fetch(RTMR2_SERVICE_URL, {
-    method: 'GET',
-    mode: 'cors'
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch expected RTMR2: HTTP ${response.status}`);
-  }
-
-  const data = await response.json();
-
-  // Handle different response formats
-  if (typeof data === 'string') {
-    return data.trim().replace(/\s/g, '');
-  }
-  if (data.rtmr2) {
-    return data.rtmr2.trim().replace(/\s/g, '');
-  }
-  if (data.value) {
-    return data.value.trim().replace(/\s/g, '');
-  }
-
-  throw new Error('Unexpected RTMR2 response format');
-}
-
 // Show result box with pass/fail status
 function showResult(outputEl, status, message) {
   if (status === 'loading') {
@@ -161,26 +101,6 @@ export async function fetchAndVerifyQuote() {
       return;
     }
 
-    // Fetch expected RTMR2 from service
-    showResult(outputEl, 'loading', 'Fetching expected RTMR2...');
-    let expectedRtmr2;
-    try {
-      expectedRtmr2 = await fetchExpectedRTMR2();
-    } catch (err) {
-      showResult(outputEl, 'fail', `Could not fetch expected RTMR2: ${err.message}`);
-      return;
-    }
-
-    if (!expectedRtmr2 || expectedRtmr2.length !== 96) {
-      showResult(outputEl, 'fail', `Invalid expected RTMR2 from service (got ${expectedRtmr2?.length || 0} chars, need 96)`);
-      return;
-    }
-
-    if (!/^[0-9a-fA-F]+$/.test(expectedRtmr2)) {
-      showResult(outputEl, 'fail', 'Expected RTMR2 from service contains invalid characters');
-      return;
-    }
-
     showResult(outputEl, 'loading', 'Fetching quote from service...');
 
     // Fetch quote from service
@@ -202,21 +122,13 @@ export async function fetchAndVerifyQuote() {
       throw new Error('Failed to decode quote data');
     }
 
-    // Verify quote
-    const result = await verifyTdxQuote(quoteBytes, {});
+    // Verify quote — RTMR2 check is performed inside the verifier
+    const result = await verifyTdxQuote(quoteBytes, {
+      expectedRTMR2: EXPECTED_RTMR2
+    });
 
     if (result instanceof Error) {
       throw result;
-    }
-
-    // Check RTMR2 - this is critical for overall verification
-    const rtmr2Check = checkRTMR2(result.body.RTMR2, expectedRtmr2);
-
-    if (!rtmr2Check.valid) {
-      // RTMR2 mismatch means verification FAILS
-      window.verificationState = 'failed';
-      showResult(outputEl, 'fail', 'RTMR2 verification failed');
-      return;
     }
 
     // Extract public key from reportData (for future signing key verification)

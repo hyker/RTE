@@ -66,7 +66,7 @@ sed -i "s|__SERVICE_URL__|$SERVICE_URL|" "$PROJECT_DIR/bundle.js"
 echo "Service URL injected: $SERVICE_URL"
 
 # Inject expected RTMR2 from server image metadata into the bundle.
-# "__RTMR2_SENTINEL__" becomes null if RTMR2 is not recorded yet, disabling the check.
+# Build fails if RTMR2 is not recorded — the client requires it.
 RTMR2_VALUE=""
 if [ -f "$SERVER_META" ]; then
   RTMR2_VALUE=$(grep "^RTMR2=" "$SERVER_META" | cut -d= -f2)
@@ -75,8 +75,8 @@ if [[ "$RTMR2_VALUE" =~ ^[0-9a-fA-F]{96}$ ]]; then
   sed -i "s/\"__RTMR2_SENTINEL__\"/\"$RTMR2_VALUE\"/" "$PROJECT_DIR/bundle.js"
   echo "RTMR2 injected: $RTMR2_VALUE"
 else
-  sed -i 's/"__RTMR2_SENTINEL__"/null/' "$PROJECT_DIR/bundle.js"
-  echo "WARNING: RTMR2 not set in $SERVER_META — RTMR2 check disabled in client"
+  echo "ERROR: RTMR2 not set in $SERVER_META — run record-rtmr2.sh first"
+  exit 1
 fi
 
 # Download Ubuntu cloud image if not present
