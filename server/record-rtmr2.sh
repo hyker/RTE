@@ -34,6 +34,9 @@ if [ -n "$EXISTING" ]; then
 fi
 
 echo "Booting VM ($MODE) to record RTMR2..."
+# Kill any stale VM from a previous run to free the port
+pkill -f "process=$VM_NAME" 2>/dev/null || true
+sleep 1
 ./boot.sh --$MODE
 
 cleanup() {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RTE Client</title>
+    <title>Restricted and Trusted Environment (RTE) Client</title>
     <style>
         * {
             box-sizing: border-box;
@@ -305,6 +305,69 @@
             color: #dc3545;
         }
 
+        .transparency-notice {
+            background: #f0f7f6;
+            border: 1px solid #c8e3df;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #2c5f58;
+            line-height: 1.6;
+        }
+
+        .transparency-notice-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .transparency-notice-icon {
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .transparency-notice-toggle {
+            background: none;
+            border: none;
+            color: #2a9d8f;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 0;
+            margin-top: 6px;
+        }
+
+        .transparency-notice-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .transparency-notice-detail {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #c8e3df;
+            font-size: 13px;
+            color: #3a6b63;
+            line-height: 1.7;
+        }
+
+        .transparency-notice-detail.open {
+            display: block;
+        }
+
+        .source-link {
+            color: #2a9d8f;
+            text-decoration: none;
+            font-weight: 500;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+        }
+
+        .source-link:hover {
+            text-decoration: underline;
+        }
+
         .action-row {
             display: flex;
             align-items: center;
@@ -350,22 +413,68 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>RTE Client</h1>
+            <h1>Restricted and Trusted Environment (RTE)</h1>
         </div>
 
-        <!-- CRL info box (shown instead of steps 1 & 2 when CRL is pre-fetched by VM) -->
-        <div class="section hidden" id="crlInfo">
-            <div class="section-title">Steps 1 & 2: Download & Upload CRL (automated)</div>
-            <p style="font-size: 14px; color: #555; margin-bottom: 12px;">CRL pre-fetched automatically by the verification service.</p>
-            <div style="font-size: 13px; color: #555; line-height: 1.8;">
-                <div>Last Update: <span id="crlDate" style="font-family: monospace;">—</span></div>
-                <div>SHA-256: <span id="crlDigest" style="font-family: monospace; word-break: break-all;">computing…</span></div>
+        <div class="transparency-notice">
+            <div class="transparency-notice-header">
+                <svg class="transparency-notice-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2a9d8f" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                <div>
+                    This client runs entirely in your browser &mdash; all verification and encryption happen locally on your device.
+                    You can inspect the source:
+                    <a class="source-link" href="browser-client.js" target="_blank">browser-client.js</a>,
+                    <a class="source-link" href="tdx-quote-verifier.js" target="_blank">tdx-quote-verifier.js</a>,
+                    <a class="source-link" href="utils.js" target="_blank">utils.js</a>
+                    <br>
+                    <button class="transparency-notice-toggle" onclick="document.getElementById('transparencyDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
+                </div>
+            </div>
+            <div class="transparency-notice-detail" id="transparencyDetail">
+                The security of this system depends on the integrity of this client code.
+                If you do not fully trust the server delivering these files, you should
+                audit the source yourself or compare it against a known-good copy before proceeding.
+                The full project source is available at
+                <a class="source-link" href="https://github.com/hyker/RTE" target="_blank">github.com/hyker/RTE</a>.
+                The served files
+                <a class="source-link" href="browser-client.js" target="_blank">browser-client.js</a>,
+                <a class="source-link" href="tdx-quote-verifier.js" target="_blank">tdx-quote-verifier.js</a>, and
+                <a class="source-link" href="utils.js" target="_blank">utils.js</a>
+                are the un-bundled originals &mdash;
+                <a class="source-link" href="bundle.js" target="_blank">bundle.js</a>
+                is produced from them using esbuild and can be reproduced from the project source.
             </div>
         </div>
 
-        <!-- Step 1: Download CRL -->
+        <!-- CRL info box (shown instead of manual CRL steps when CRL is pre-fetched by VM) -->
+        <div class="transparency-notice hidden" id="crlInfo">
+            <div class="transparency-notice-header">
+                <svg class="transparency-notice-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2a9d8f" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <div>
+                    <strong>Certificate Revocation List (CRL)</strong> &mdash;
+                    Intel's CRL is needed to verify the TDX attestation quote.
+                    It is served by this server, which pre-fetches it from Intel periodically.
+                    Its authenticity is verified cryptographically as part of the quote verification below.
+                    <br>
+                    <button class="transparency-notice-toggle" onclick="document.getElementById('crlDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
+                </div>
+            </div>
+            <div class="transparency-notice-detail" id="crlDetail">
+                <div style="margin-bottom: 8px;">Last Update: <span id="crlDate" style="font-family: monospace;">—</span></div>
+                <div>
+                    <a class="source-link" href="https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der" target="_blank">Download CRL directly from Intel</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download CRL (manual, shown when CRL is not pre-fetched) -->
         <div class="section" id="step1">
-            <div class="section-title">Step 1: Download CRL</div>
+            <div class="section-title">Download CRL</div>
             <p style="margin-bottom: 12px; font-size: 14px; color: #555;">
                 Download the Intel Platform CRL file required for verification.
             </p>
@@ -382,9 +491,9 @@
             </a>
         </div>
 
-        <!-- Step 2: Upload CRL -->
+        <!-- Upload CRL (manual) -->
         <div class="section hidden" id="step2">
-            <div class="section-title">Step 2: Upload CRL</div>
+            <div class="section-title">Upload CRL</div>
             <div class="drop-zone" id="crlDropZone" onclick="document.getElementById('crlFile').click()">
                 <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M12 16V4m0 0L8 8m4-4l4 4"/>
@@ -400,23 +509,39 @@
             <div class="file-list" id="crlFileList"></div>
         </div>
 
-        <!-- Step 3: Verify Quote -->
+        <!-- Verify Quote -->
         <div class="section hidden" id="step3">
-            <div class="section-title">Step 3: Verify Quote</div>
-            <p style="margin-bottom: 16px; font-size: 14px; color: #555;">
-                Fetch and verify the TDX quote from the service. The expected RTMR2 will be queried automatically.
+            <div class="section-title">Verify Quote</div>
+            <p style="margin-bottom: 12px; font-size: 14px; color: #555;">
+                This verifies the authenticity of the remote server by fetching and checking its TDX attestation quote.
+                The verification confirms two things: that the server is running inside a genuine Intel TDX trusted execution environment,
+                and that the code running inside it matches the expected measurement (RTMR2).
             </p>
-            <button id="verifyButton" class="btn btn-primary" onclick="fetchAndVerifyQuote()">
-                Fetch & Verify Quote
-            </button>
+            <button class="transparency-notice-toggle" onclick="document.getElementById('rtmr2Detail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
+            <div class="transparency-notice-detail" id="rtmr2Detail" style="margin-top: 0; padding-top: 12px;">
+                <div style="margin-bottom: 8px;">
+                    Expected RTMR2: <span id="expectedRtmr2" style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 12px; word-break: break-all;">—</span>
+                </div>
+                <p style="margin: 0;">
+                    The RTMR2 value is a measurement of the code running inside the TDX enclave.
+                    This expected value is embedded in this client at build time.
+                    If you do not trust this server, you should obtain the expected RTMR2 from a trusted channel
+                    and compare it with the value shown above.
+                </p>
+            </div>
+            <div style="margin-top: 16px;">
+                <button id="verifyButton" class="btn btn-primary" onclick="fetchAndVerifyQuote()">
+                    Fetch & Verify Quote
+                </button>
+            </div>
             <div style="margin-top: 16px;">
                 <div id="output"></div>
             </div>
         </div>
 
-        <!-- Step 4: Upload Test Job -->
+        <!-- Upload Test Job -->
         <div class="section hidden" id="step4">
-            <div class="section-title">Step 4: Upload Test Job</div>
+            <div class="section-title">Upload Test Job</div>
 
             <div id="testConfigSection">
                 <label style="font-size: 13px; color: #555; display: block; margin-bottom: 8px;">
@@ -425,12 +550,39 @@
                 <textarea id="testConfig"
                           class="text-input"
                           placeholder='{"tool_name": "cppcheck", "parameters": []}'>{"tool_name": "cppcheck", "parameters": []}</textarea>
+
+                <div style="margin-top: 12px; font-size: 13px; color: #555; line-height: 1.6;">
+                    Please verify the tool and its parameters before proceeding.
+                    The RTE guarantees isolation of the analysis environment, but does not control
+                    the behaviour of the selected tool &mdash; you must independently trust the tool you choose to run.
+                    <br>
+                    <button class="transparency-notice-toggle" onclick="document.getElementById('toolDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
+                </div>
+                <div class="transparency-notice-detail" id="toolDetail">
+                    The RTE provides a trusted execution environment that isolates the analysis from external observation.
+                    However, the RTE does not audit or endorse any specific tool. The tool operates on your data
+                    within the enclave, so you should only select tools you trust to handle your assets appropriately.
+                </div>
+
                 <div class="divider"></div>
             </div>
 
-            <label style="font-size: 13px; color: #555; display: block; margin-bottom: 12px;">
+            <label style="font-size: 13px; color: #555; display: block; margin-bottom: 4px;">
                 TOE File (Target of Evaluation)
             </label>
+            <div style="font-size: 13px; color: #555; line-height: 1.6; margin-bottom: 12px;">
+                Your file will be encrypted locally on your device before upload.
+                It can only be decrypted inside the verified trusted enclave &mdash; no one else can access it, not even us.
+                <br>
+                <button class="transparency-notice-toggle" onclick="document.getElementById('encryptionDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
+            </div>
+            <div class="transparency-notice-detail" id="encryptionDetail" style="margin-bottom: 12px;">
+                Encryption is performed in your browser using a public key extracted from the server's
+                attested TDX quote. The corresponding private key exists only inside the enclave and
+                is never exposed. This ensures that your data remains confidential in transit and at rest,
+                and can only be processed within the isolated environment whose integrity was verified
+                in the previous step.
+            </div>
             <div class="drop-zone" id="toeDropZone" onclick="document.getElementById('toeFile').click()">
                 <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M12 16V4m0 0L8 8m4-4l4 4"/>
@@ -440,7 +592,6 @@
                 <div class="drop-zone-text">Drag & Drop</div>
                 <div class="drop-zone-or">or</div>
                 <span class="btn btn-primary">Choose File</span>
-                <div class="helper-text" style="margin-top: 12px;">Maximum file size 10Mb</div>
             </div>
             <input type="file" id="toeFile" class="file-input">
             <div class="file-list" id="toeFileList"></div>

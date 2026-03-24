@@ -9,19 +9,17 @@ const UPLOAD_SERVICE_URL = `${SERVICE_BASE_URL}/upload`;
 // Expected RTMR2 — injected at build time from server .meta file
 const EXPECTED_RTMR2 = "__RTMR2_SENTINEL__";
 
+// Display expected RTMR2 in the UI
+const rtmr2El = document.getElementById('expectedRtmr2');
+if (rtmr2El) {
+  rtmr2El.textContent = EXPECTED_RTMR2;
+}
+
 // Global storage for uploaded CRL — pre-load from VM-fetched CRL if available
 window.uploadedCRL = window.EMBEDDED_CRL
   ? Uint8Array.from(atob(window.EMBEDDED_CRL), c => c.charCodeAt(0))
   : null;
 
-// Compute and display SHA-256 digest of pre-fetched CRL
-if (window.uploadedCRL) {
-  crypto.subtle.digest('SHA-256', window.uploadedCRL).then(buf => {
-    const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    const el = document.getElementById('crlDigest');
-    if (el) el.textContent = hex;
-  });
-}
 
 // Global storage for extracted public key
 window.extractedPublicKey = null;
@@ -325,9 +323,16 @@ export async function uploadTestJob() {
     const jobId = data.jobID || data.job_id || data.id;
     if (jobId) {
       window.uploadCompleted = true;
-      showJobId(outputEl, jobId);
       buttonEl.disabled = true;
       buttonEl.textContent = 'Uploaded';
+
+      if (window.opener) {
+        // Opened as popup — parent receives job ID via postMessage
+        outputEl.innerHTML = '<div class="result-box pass">Upload complete</div>';
+      } else {
+        // Standalone — show job ID directly
+        showJobId(outputEl, jobId);
+      }
 
       // Notify parent window if opened as popup
       if (window.opener) {
