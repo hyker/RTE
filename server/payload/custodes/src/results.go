@@ -33,35 +33,49 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 	_, errRunning := os.Stat(filePath + ".running")
 	_, errRes := os.Stat(filePath + ".output")
 	_, errErr := os.Stat(filePath + ".failed")
+	_, errExpired := os.Stat(filePath + ".expired")
 
 	isRunning := errRunning == nil
 	noResults := errRes != nil
 	errorOutput := errErr == nil
+	isExpired := errExpired == nil
 
-	if errorOutput {
-
+	if isExpired {
 		response := map[string]interface{}{
-			"jobID": payload.Identifier,
-			"status":     "error",
+			"jobID":  payload.Identifier,
+			"status": "error",
+			"reason": "expired",
 		}
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		json.NewEncoder(w).Encode(response)
+		return
+
+	} else if errorOutput {
+		response := map[string]interface{}{
+			"jobID":  payload.Identifier,
+			"status": "error",
+			"reason": "processing_failed",
 		}
+		json.NewEncoder(w).Encode(response)
+		cleanupTOE(filePath, false)
+		return
 
 	} else if isRunning {
-		// w.Write([]byte("No results ready for request with identifier: " + payload.Identifier + "\n"))
 		response := map[string]interface{}{
-			"jobID": payload.Identifier,
-			"status":     "pending",
+			"jobID":  payload.Identifier,
+			"status": "pending",
 		}
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	} else if noResults {
-		// http.Error(w, fmt.Sprintf("Error %v", errRes), http.StatusBadRequest)
-		w.Write([]byte("No such request: " + payload.Identifier + "\n"))
+		response := map[string]interface{}{
+			"jobID":  payload.Identifier,
+			"status": "error",
+			"reason": "not_found",
+		}
+		json.NewEncoder(w).Encode(response)
+		return
 	} else { // send results
 		// read file
 		output, err := os.ReadFile(filePath + ".output")
@@ -145,7 +159,7 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// w.Write([]byte("RESULTS_DUMMY"))
+		cleanupTOE(filePath, false)
 	}
 }
 

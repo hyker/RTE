@@ -102,7 +102,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	reqId, err := storeRequest(decoded, toeDir)
 	if err != nil {
-		w.Write([]byte("Error:" + err.Error()))
+		http.Error(w, fmt.Sprintf(`{"status":"error","reason":"storage_failed","detail":"%v"}`, err), http.StatusInternalServerError)
 		return
 	}
 

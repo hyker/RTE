@@ -261,6 +261,13 @@ In `--debug` builds the builder is interactively prompted for a root password at
 - Systemd service: `custodes.service` (auto-start)
 - Tools: cppcheck, checksec, dependency-check
 
+**TOE Cleanup:**
+TOE files are automatically cleaned up to prevent `/var/tmp` from filling up:
+- **On result download:** When a client fetches results (status `"done"` or `"error"`), all associated TOE files (`.input`, `.suite`, `.output`, `.failed`) are deleted immediately after the response is sent.
+- **Stale file sweeper:** A background goroutine runs every hour and deletes all TOE files older than `MaxTOEAge` (default: 30 days, configured in `cleanup.go`). Stale jobs get a `.expired` marker file left behind so subsequent `/result` polls return `"reason": "expired"` instead of `"not_found"`. Expired markers are cleaned up after double the max age (60 days).
+- **`/result` error responses** now include a `reason` field: `"processing_failed"` (tool execution failed), `"expired"` (cleaned up by sweeper), or `"not_found"` (job ID never existed).
+- **Upload disk-full:** If writing the TOE to disk fails (e.g. tmpfs full), the upload endpoint returns a JSON error with `"reason": "storage_failed"` and HTTP 500.
+
 **Read-only Adaptations:**
 - Binaries/configs: `/opt/custodes/` (read-only, dm-verity protected)
 - Runtime data: `/var/tmp/custodes/` (tmpfs, writable)
@@ -320,9 +327,13 @@ After verifying the image, obtain the expected RTMR2 value:
 - Infrastructure owners: `curl -k https://localhost:9001/rtmr2` (dev) or `curl -k https://localhost:8444/rtmr2` (staging)
 - Third-party verifiers: use [tdx-measure](https://github.com/virtee/tdx-measure) to calculate RTMR values directly from the image
 
+## Known Issues
+
+* **Non-TDX builds are currently broken.** The build pipeline and custodes service assume TDX hardware is available (quote generator, RTMR2 recording). Builds without `--tdx` will fail at the RTMR2 recording step and the service may not start correctly. Use `--tdx` on TDX-capable hardware for now.
+
 ## Notes about current state and next steps
 
  * Make debug version note that very clearly (in output? or some other fashion)
  * move "add payload" scrtipt into function of build base instead.
  * move different parts of build base into separate functions
- * **Custodes TOE cleanup:** Implement automatic deletion of TOE files after results are successfully downloaded to prevent /tmp from filling up. Consider max storage time (e.g., 24-48 hours) for unclaimed results.
+ * ~~**Custodes TOE cleanup:** Done. See "TOE Cleanup" section below.~~

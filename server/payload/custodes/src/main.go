@@ -37,6 +37,8 @@ func main() {
 			Certificates: []tls.Certificate{tlsCert},
 		},
 	}
+	startSweeper("/var/tmp/custodes/toes")
+
 	log.Printf("Starting HTTPS server on :9000")
 	log.Fatal(server.ListenAndServeTLS("", ""))
 }
