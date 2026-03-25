@@ -327,6 +327,42 @@ After verifying the image, obtain the expected RTMR2 value:
 - Infrastructure owners: `curl -k https://localhost:9001/rtmr2` (dev) or `curl -k https://localhost:8444/rtmr2` (staging)
 - Third-party verifiers: use [tdx-measure](https://github.com/virtee/tdx-measure) to calculate RTMR values directly from the image
 
+## Planned Tools
+
+All tools must run entirely within the RTE — no sending data to external services or depending on cloud compute. Syncing a vulnerability database from an upstream source is acceptable.
+
+**Current tools:** cppcheck, checksec, dependency-check
+
+### Should be installed
+
+| Tool | Purpose |
+|------|---------|
+| [binwalk](https://github.com/ReFirmLabs/binwalk) | Firmware analysis — extract and analyze embedded file systems, compressed archives, and binary blobs |
+| [AESKeyFinder](https://github.com/makomk/aeskeyfind) | Scan memory dumps or binary images for AES key schedules |
+| [AFL++](https://github.com/AFLplusplus/AFLplusplus) | Coverage-guided fuzzing framework for compiled binaries and source code |
+
+### Might be installed
+
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| [SonarQube CE](https://www.sonarsource.com/open-source-editions/sonarqube-community-edition/) | Multi-language static analysis (bugs, code smells, security hotspots) | Self-hosted; heavyweight (JVM + embedded DB, ~2GB+ RAM). May strain tmpfs/RAM budget |
+| [EMBA](https://github.com/e-m-b-a/emba) | Embedded Linux firmware security analysis | Has an optional AI mode that calls external APIs — must be disabled |
+| [Semgrep OSS](https://github.com/semgrep/semgrep) | Lightweight, pattern-based static analysis for many languages | Must use OSS engine only — Semgrep Cloud/App sends code to external servers |
+| [pgBadger](https://github.com/darold/pgbadger) | PostgreSQL log analyzer — performance and error reporting | Niche; useful if TOEs include PG logs |
+
+### Can be installed upon request
+
+| Tool | Purpose |
+|------|---------|
+| [Trivy](https://github.com/aquasecurity/trivy) | Vulnerability and misconfiguration scanner for containers, filesystems, SBOMs |
+| [Bandit](https://github.com/PyCQA/bandit) | Python-specific security linter |
+| [SpotBugs / FindSecBugs](https://github.com/find-sec-bugs/find-sec-bugs) | Java bytecode security analysis |
+| [Flawfinder](https://github.com/david-a-wheeler/flawfinder) | C/C++ source security scanner (complements cppcheck) |
+| [Grype](https://github.com/anchore/grype) | Vulnerability scanner for SBOMs and filesystem artifacts |
+| [Syft](https://github.com/anchore/syft) | SBOM generator (pairs with Grype/Trivy) |
+| [PMD](https://github.com/pmd/pmd) | Java/Apex/JS source code analyzer |
+| [ESLint + security plugin](https://github.com/eslint/eslint) | JavaScript/TypeScript security linting |
+
 ## Known Issues
 
 * **Non-TDX builds are currently broken.** The build pipeline and custodes service assume TDX hardware is available (quote generator, RTMR2 recording). Builds without `--tdx` will fail at the RTMR2 recording step and the service may not start correctly. Use `--tdx` on TDX-capable hardware for now.
