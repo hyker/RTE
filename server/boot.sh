@@ -76,8 +76,10 @@ case $MODE in
     SSH_PORT=2222
     VM_NAME="verity-prod"
     GUEST_CID=6
-    DISK_IMAGE="$BASE_IMAGE"
-    DISK_OPTS=""
+    DISK_IMAGE="verity-prod-overlay.img"
+    DISK_OPTS=",backing.file.locking=off"
+    rm -f "$DISK_IMAGE"
+    qemu-img create -f qcow2 -b "$BASE_IMAGE" -F qcow2 "$DISK_IMAGE" >/dev/null
     ;;
   dev)
     HTTPS_PORT=9444
