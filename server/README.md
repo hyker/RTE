@@ -259,13 +259,13 @@ In `--debug` builds the builder is interactively prompted for a root password at
 - Storage: tmpfs at `/var/tmp/custodes/toes` (ephemeral)
 - CORS: all origins allowed (`Access-Control-Allow-Origin: *`) including private network access (`Access-Control-Allow-Private-Network: true`), enabling browser-based clients to call the API directly
 - Systemd service: `custodes.service` (auto-start)
-- Tools: cppcheck, checksec, dependency-check
+- Tools: cppcheck, checksec, dependency-check, binwalk
 
 **TOE Cleanup:**
 TOE files are automatically cleaned up to prevent `/var/tmp` from filling up:
 - **On result download:** When a client fetches results (status `"done"` or `"error"`), all associated TOE files (`.input`, `.suite`, `.output`, `.failed`) are deleted immediately after the response is sent.
 - **Stale file sweeper:** A background goroutine runs every hour and deletes all TOE files older than `MaxTOEAge` (default: 30 days, configured in `cleanup.go`). Stale jobs get a `.expired` marker file left behind so subsequent `/result` polls return `"reason": "expired"` instead of `"not_found"`. Expired markers are cleaned up after double the max age (60 days).
-- **`/result` error responses** now include a `reason` field: `"processing_failed"` (tool execution failed), `"expired"` (cleaned up by sweeper), or `"not_found"` (job ID never existed).
+- **`/result` error responses** now include a `reason` field: `"processing_failed"` (tool execution failed), `"expired"` (cleaned up by sweeper), or `"not_found"` (job ID never existed or already downloaded).
 - **Upload disk-full:** If writing the TOE to disk fails (e.g. tmpfs full), the upload endpoint returns a JSON error with `"reason": "storage_failed"` and HTTP 500.
 
 **Read-only Adaptations:**
@@ -331,13 +331,13 @@ After verifying the image, obtain the expected RTMR2 value:
 
 All tools must run entirely within the RTE — no sending data to external services or depending on cloud compute. Syncing a vulnerability database from an upstream source is acceptable.
 
-**Current tools:** cppcheck, checksec, dependency-check
+**Current tools:** cppcheck, checksec, dependency-check, binwalk
 
 ### Should be installed
 
 | Tool | Purpose |
 |------|---------|
-| [binwalk](https://github.com/ReFirmLabs/binwalk) | Firmware analysis — extract and analyze embedded file systems, compressed archives, and binary blobs |
+| ~~[binwalk](https://github.com/ReFirmLabs/binwalk)~~ | ~~Firmware analysis~~ — **done** |
 | [AESKeyFinder](https://github.com/makomk/aeskeyfind) | Scan memory dumps or binary images for AES key schedules |
 | [AFL++](https://github.com/AFLplusplus/AFLplusplus) | Coverage-guided fuzzing framework for compiled binaries and source code |
 
@@ -364,6 +364,8 @@ All tools must run entirely within the RTE — no sending data to external servi
 | [ESLint + security plugin](https://github.com/eslint/eslint) | JavaScript/TypeScript security linting |
 
 ## Known Issues
+
+* **`not_found` conflates "never existed" and "already downloaded".** After a result is fetched, all TOE files are deleted with no marker left behind. A subsequent `/result` poll returns `"not_found"`, which is indistinguishable from a job ID that never existed. Should add an `"already_downloaded"` marker and reason (similar to how the stale sweeper leaves `.expired`).
 
 * **Non-TDX builds are currently broken.** The build pipeline and custodes service assume TDX hardware is available (quote generator, RTMR2 recording). Builds without `--tdx` will fail at the RTMR2 recording step and the service may not start correctly. Use `--tdx` on TDX-capable hardware for now.
 

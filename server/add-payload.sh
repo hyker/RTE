@@ -35,9 +35,9 @@ sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
   --copy-in payload/custodes/custodes:/usr/local/bin \
   --run-command "chmod +x /usr/local/bin/custodes"
 
-# Install cppcheck
+# Install cppcheck and binwalk
 sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
-  --install cppcheck
+  --install cppcheck,binwalk
 
 # Install checksec
 sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \

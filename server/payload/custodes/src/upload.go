@@ -96,7 +96,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// read and store ToE
 	decoded, err := base64.StdEncoding.DecodeString(payload.TOE.Base64EncodedTOE)
 	if err != nil {
-		fmt.Println("Error decoding string:", err)
+		http.Error(w, `{"status":"error","reason":"invalid_base64"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -115,6 +115,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			runner = NewChecksecRunner(payload.Test)
 		case "dependency-check":
 			runner = NewDependencyCheckRunner(payload.Test)
+		case "binwalk":
+			runner = NewBinwalkRunner(payload.Test)
 		default:
 			w.Write([]byte("No such tool exsists"))
 			return

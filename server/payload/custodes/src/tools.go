@@ -196,6 +196,31 @@ func (c *DependencyCheckRunner) Name() string {
 	return c.Tool.ToolName
 }
 
+// BinwalkRunner runs binwalk firmware analysis
+type BinwalkRunner struct {
+	Tool
+}
+
+func NewBinwalkRunner(tool Tool) ToolRunner {
+	return &BinwalkRunner{Tool: tool}
+}
+
+func (runner *BinwalkRunner) Run(inputPath string) (string, error) {
+	args := []string{inputPath}
+	params := parametersToStringArray(runner.Tool.Parameters)
+	args = append(args, params...)
+	cmd := exec.Command("binwalk", args...)
+	// binwalk v2 requires a writable user config dir (~/.config/binwalk/magic/).
+	// On a read-only root (dm-verity) this doesn't exist and binwalk silently
+	// produces no output. Point XDG_CONFIG_HOME at writable tmpfs instead.
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME=/tmp/binwalk")
+	return runCmd(cmd)
+}
+
+func (c *BinwalkRunner) Name() string {
+	return c.Tool.ToolName
+}
+
 // ============================================================================
 // Utility Functions
 // ============================================================================
@@ -306,7 +331,19 @@ func allowedTools() []Tool {
 	}
 	dependencyCheck.Parameters = append(dependencyCheck.Parameters, depCheckFormat, depCheckFileType)
 
-	tools = append(tools, cppcheck, checksec, dependencyCheck)
+	// binwalk configuration
+	binwalk := Tool{
+		ToolName:   "binwalk",
+		Parameters: []Parameter{},
+	}
+	binwalkEntropy := Parameter{
+		ParamName: "-E",
+		Optional:  &optionalTrue,
+		Value:     nil,
+	}
+	binwalk.Parameters = append(binwalk.Parameters, binwalkEntropy)
+
+	tools = append(tools, cppcheck, checksec, dependencyCheck, binwalk)
 
 	return tools
 }
