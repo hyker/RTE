@@ -50,17 +50,6 @@ fi
 
 source "${BASE_IMAGE}.meta"
 
-echo "Verifying image integrity ($BASE_IMAGE)..."
-ACTUAL_SHA256=$(sha256sum "$BASE_IMAGE" | awk '{print $1}')
-if [ "$ACTUAL_SHA256" != "$IMAGE_SHA256" ]; then
-  echo "Error: $BASE_IMAGE hash mismatch!"
-  echo "  Expected: $IMAGE_SHA256"
-  echo "  Actual:   $ACTUAL_SHA256"
-  echo "The image and metadata are out of sync. Re-run setup-verity.sh."
-  exit 1
-fi
-echo "Image integrity verified."
-
 # Load CF API token and pass to VM via fw_cfg (never touches the image)
 if [ ! -f secrets.sh ]; then
   echo "Error: secrets.sh not found. Create it with CF_API_TOKEN=<token>."

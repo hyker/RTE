@@ -98,7 +98,7 @@ build-base.sh ──> setup-verity.sh ──> boot.sh
 
 3. **boot.sh** - At boot, the kernel uses the root hash (now in grub.cfg) to verify every block read from the root filesystem via dm-verity. Any tampering causes read failures.
 
-**Metadata chain:** `build-base.sh` writes `build.meta` (TDX flag, debug flag, required VM RAM). `setup-verity.sh` reads `build.meta` and writes `<image>.meta` (adds image SHA-256). `boot.sh` reads `<image>.meta` to select the correct QEMU command, allocate RAM, and verify image integrity before boot.
+**Metadata chain:** `build-base.sh` writes `build.meta` (TDX flag, debug flag, required VM RAM). `setup-verity.sh` reads `build.meta` and writes `<image>.meta` (TDX, debug, RAM, RTMR2 placeholder). `record-rtmr2.sh` fills in the RTMR2 value. `boot.sh` reads `<image>.meta` to select the correct QEMU command and allocate RAM.
 
 ## How to use
 
@@ -156,7 +156,7 @@ cd client/vm && ./build.sh --prod|--dev
 
 **RTMR2 and the client bundle:** Step 3 records the expected RTMR2 value into `verity-image.img.meta`. Step 4 reads it and bakes it as a constant into `bundle.js` — the client verifier compares the quote's RTMR2 against this hardcoded value rather than trusting the enclave to report its own. If RTMR2 is not yet set in `.meta` (e.g. non-TDX builds), the check is disabled and a warning is printed during the client build.
 
-`boot.sh` verifies the sha256 of the image against `verity-image.img.meta` before booting, ensuring the image and its metadata are in sync. It also passes the Cloudflare API token to the VM via QEMU `fw_cfg` — the token is never written to the image.
+`boot.sh` reads `verity-image.img.meta` for VM configuration (TDX mode, RAM size). Image integrity is ensured at runtime by dm-verity (root filesystem) and RTMR2 (full boot chain). The Cloudflare API token is passed to the VM via QEMU `fw_cfg` — never written to the image.
 
 ## Security model
 

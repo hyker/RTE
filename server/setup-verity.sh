@@ -101,15 +101,13 @@ if [ ! -f build.meta ]; then
 fi
 source build.meta
 
-# Compute image hash and write final metadata
-IMAGE_SHA256=$(sha256sum "$OUTPUT_IMAGE" | awk '{print $1}')
+# Write final metadata
 cat > "${OUTPUT_IMAGE}.meta" <<EOF
 TDX=$TDX
 DEBUG=$DEBUG
 VM_MEMORY=$VM_MEMORY
-IMAGE_SHA256=$IMAGE_SHA256
 RTMR2=
 EOF
 
 echo "Verity setup complete. Root hash written to veritydata.txt. Image written to $OUTPUT_IMAGE"
-echo "Image metadata written to ${OUTPUT_IMAGE}.meta (sha256: $IMAGE_SHA256)"
+echo "Image metadata written to ${OUTPUT_IMAGE}.meta"
