@@ -221,6 +221,28 @@ func (c *BinwalkRunner) Name() string {
 	return c.Tool.ToolName
 }
 
+// AESKeyFinderRunner runs aeskeyfind analysis
+type AESKeyFinderRunner struct {
+	Tool
+}
+
+func NewAESKeyFinderRunner(tool Tool) ToolRunner {
+	return &AESKeyFinderRunner{Tool: tool}
+}
+
+func (runner *AESKeyFinderRunner) Run(inputPath string) (string, error) {
+	args := []string{}
+	params := parametersToStringArray(runner.Tool.Parameters)
+	args = append(args, params...)
+	args = append(args, inputPath)
+	cmd := exec.Command("/opt/custodes/tools/aeskeyfind/aeskeyfind", args...)
+	return runCmd(cmd)
+}
+
+func (c *AESKeyFinderRunner) Name() string {
+	return c.Tool.ToolName
+}
+
 // ============================================================================
 // Utility Functions
 // ============================================================================
@@ -343,7 +365,29 @@ func allowedTools() []Tool {
 	}
 	binwalk.Parameters = append(binwalk.Parameters, binwalkEntropy)
 
-	tools = append(tools, cppcheck, checksec, dependencyCheck, binwalk)
+	// aeskeyfind configuration
+	aeskeyfind := Tool{
+		ToolName:   "aeskeyfind",
+		Parameters: []Parameter{},
+	}
+	aeskeyfindVerbose := Parameter{
+		ParamName: "-v",
+		Optional:  &optionalTrue,
+		Value:     nil,
+	}
+	aeskeyfindQuiet := Parameter{
+		ParamName: "-q",
+		Optional:  &optionalTrue,
+		Value:     nil,
+	}
+	aeskeyfindThreshold := Parameter{
+		ParamName: "-t ",
+		Optional:  &optionalTrue,
+		Value:     []string{"0", "1", "2", "5", "10", "15", "20"},
+	}
+	aeskeyfind.Parameters = append(aeskeyfind.Parameters, aeskeyfindVerbose, aeskeyfindQuiet, aeskeyfindThreshold)
+
+	tools = append(tools, cppcheck, checksec, dependencyCheck, binwalk, aeskeyfind)
 
 	return tools
 }

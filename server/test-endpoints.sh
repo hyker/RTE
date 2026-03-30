@@ -36,6 +36,11 @@ if echo "$TOOLS" | grep -q '"tool_name":"binwalk"'; then
 else
   fail "binwalk not found in response"
 fi
+if echo "$TOOLS" | grep -q '"tool_name":"aeskeyfind"'; then
+  pass "lists aeskeyfind"
+else
+  fail "aeskeyfind not found in response"
+fi
 
 # Test /quote
 echo "--- /quote ---"
@@ -178,6 +183,44 @@ run_tool_test "cppcheck" "cppcheck" "$CPPCHECK_TOE" "[]"
 # Test binwalk upload (minimal gzip header — binwalk will identify the signature)
 BINWALK_TOE=$(printf '\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03' | cat - /dev/zero 2>/dev/null | head -c 74 | base64 -w0)
 run_tool_test "binwalk" "binwalk" "$BINWALK_TOE" "[]"
+
+# Test aeskeyfind upload
+# Generate a 4KB blob with a valid AES-128 key schedule embedded in random-looking data.
+# Zero padding triggers aeskeyfind's entropy filter, so we use pseudo-random fill instead.
+# The -q flag suppresses the progress bar (which goes to stderr and pollutes results).
+AESKEYFIND_TOE=$(python3 -c "
+import hashlib
+SBOX = [0]*256
+p, q = 1, 1
+while True:
+    p ^= (p << 1) ^ (0x1b if p & 0x80 else 0); p &= 0xff
+    q ^= q << 1; q ^= q << 2; q ^= q << 4
+    q ^= 0x09 if q & 0x80 else 0; q &= 0xff
+    v = q ^ ((q<<1)|(q>>7)) ^ ((q<<2)|(q>>6)) ^ ((q<<3)|(q>>5)) ^ ((q<<4)|(q>>4))
+    v = (v ^ 0x63) & 0xff
+    SBOX[p] = v
+    if p == 1: break
+SBOX[0] = 0x63
+RCON = [0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36]
+key = bytes([0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c])
+schedule = bytearray(key)
+for i in range(10):
+    prev = schedule[-16:]
+    t = bytearray([SBOX[prev[13]], SBOX[prev[14]], SBOX[prev[15]], SBOX[prev[12]]])
+    t[0] ^= RCON[i]
+    w = bytearray(16)
+    for j in range(4):
+        for k in range(4):
+            if j == 0: w[k] = prev[k] ^ t[k]
+            else: w[j*4+k] = w[(j-1)*4+k] ^ prev[j*4+k]
+    schedule.extend(w)
+# pseudo-random fill (deterministic, no os.urandom needed)
+fill = b''
+for i in range(128):
+    fill += hashlib.sha256(i.to_bytes(4,'big')).digest()
+import sys; sys.stdout.buffer.write(fill[:2048] + bytes(schedule) + fill[2048:2048+1872])
+" | base64 -w0)
+run_tool_test "aeskeyfind" "aeskeyfind" "$AESKEYFIND_TOE" '[{"param_name":"-q","value":null}]'
 
 echo "========================================="
 if [ $FAILED -eq 0 ]; then

@@ -4,3 +4,6 @@
 [submodule "server/payload/custodes/tools/checksec"]
 	path = server/payload/custodes/tools/checksec
 	url = https://github.com/slimm609/checksec.git
+[submodule "server/payload/custodes/tools/aeskeyfind"]
+	path = server/payload/custodes/tools/aeskeyfind
+	url = https://github.com/hyker/aeskeyfind

@@ -117,6 +117,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			runner = NewDependencyCheckRunner(payload.Test)
 		case "binwalk":
 			runner = NewBinwalkRunner(payload.Test)
+		case "aeskeyfind":
+			runner = NewAESKeyFinderRunner(payload.Test)
 		default:
 			w.Write([]byte("No such tool exsists"))
 			return

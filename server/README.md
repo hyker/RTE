@@ -259,7 +259,7 @@ In `--debug` builds the builder is interactively prompted for a root password at
 - Storage: tmpfs at `/var/tmp/custodes/toes` (ephemeral)
 - CORS: all origins allowed (`Access-Control-Allow-Origin: *`) including private network access (`Access-Control-Allow-Private-Network: true`), enabling browser-based clients to call the API directly
 - Systemd service: `custodes.service` (auto-start)
-- Tools: cppcheck, checksec, dependency-check, binwalk
+- Tools: cppcheck, checksec, dependency-check, binwalk, aeskeyfind
 
 **TOE Cleanup:**
 TOE files are automatically cleaned up to prevent `/var/tmp` from filling up:
@@ -272,6 +272,7 @@ TOE files are automatically cleaned up to prevent `/var/tmp` from filling up:
 - Binaries/configs: `/opt/custodes/` (read-only, dm-verity protected)
 - Runtime data: `/var/tmp/custodes/` (tmpfs, writable)
 - dependency-check: Uses `--data /var/tmp/custodes/dependency-check-data` instead of default `/root/.m2/`
+- aeskeyfind: Built with `-O1 -fno-strict-aliasing` — upstream Makefile uses `-O4`, which triggers a GCC 13 strict-aliasing miscompilation that silently breaks key schedule detection
 
 **TDX Quote Service (--tdx builds only):**
 - Binary: `/opt/tdx-quote-service/quote-generator` (C, uses Intel TDX attestation library)
@@ -331,14 +332,14 @@ After verifying the image, obtain the expected RTMR2 value:
 
 All tools must run entirely within the RTE — no sending data to external services or depending on cloud compute. Syncing a vulnerability database from an upstream source is acceptable.
 
-**Current tools:** cppcheck, checksec, dependency-check, binwalk
+**Current tools:** cppcheck, checksec, dependency-check, binwalk, aeskeyfind
 
 ### Should be installed
 
 | Tool | Purpose |
 |------|---------|
 | ~~[binwalk](https://github.com/ReFirmLabs/binwalk)~~ | ~~Firmware analysis~~ — **done** |
-| [AESKeyFinder](https://github.com/makomk/aeskeyfind) | Scan memory dumps or binary images for AES key schedules |
+| ~~[AESKeyFinder](https://github.com/makomk/aeskeyfind)~~ | ~~Scan memory dumps or binary images for AES key schedules~~ — **done** |
 | [AFL++](https://github.com/AFLplusplus/AFLplusplus) | Coverage-guided fuzzing framework for compiled binaries and source code |
 
 ### Might be installed

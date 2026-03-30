@@ -15,6 +15,19 @@ make clean
 make build
 cd ../..
 
+# Build aeskeyfind from source
+if [ ! -f "payload/custodes/tools/aeskeyfind/aeskeyfind" ]; then
+  echo "Building aeskeyfind..."
+  mkdir -p payload/custodes/tools/aeskeyfind
+  cd payload/custodes/tools/aeskeyfind
+  if [ ! -f "aeskeyfind.c" ]; then
+    git clone https://github.com/makomk/aeskeyfind .
+  fi
+  make clean
+  make
+  cd ../../../..
+fi
+
 # Build checksec binary
 cd payload/custodes/tools/checksec
 go build -o checksec .
@@ -44,6 +57,11 @@ sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
   --run-command "mkdir -p /opt/custodes/tools" \
   --copy-in payload/custodes/tools/checksec:/opt/custodes/tools \
   --run-command "chmod +x /opt/custodes/tools/checksec/checksec"
+
+# Install aeskeyfind
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --copy-in payload/custodes/tools/aeskeyfind:/opt/custodes/tools \
+  --run-command "chmod +x /opt/custodes/tools/aeskeyfind/aeskeyfind"
 
 # Install Java and dependency-check
 sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
