@@ -31,6 +31,11 @@ KoZIzj0EAwIDSQAwRgIhAIpQ/KlO1XE4hH8cw5Ol/E0yzs8PToJe9Pclt+bhfLUg
 AiEAss0qf7FlMmAMet+gbpLD97ldYy/wqjjmwN7yHRVr2AM=
 -----END CERTIFICATE-----`;
 
+// Intel Root CA CRL (DER, base64-encoded). Updated yearly by Intel;
+// refresh from https://certificates.trustedservices.intel.com/IntelSGXRootCA.crl
+// Current: lastUpdate=Feb 26 2026, nextUpdate=Feb 26 2027
+const INTEL_ROOT_CA_CRL_B64 = "MIIBIjCByAIBATAKBggqhkjOPQQDAjBoMRowGAYDVQQDDBFJbnRlbCBTR1ggUm9vdCBDQTEaMBgGA1UECgwRSW50ZWwgQ29ycG9yYXRpb24xFDASBgNVBAcMC1NhbnRhIENsYXJhMQswCQYDVQQIDAJDQTELMAkGA1UEBhMCVVMXDTI2MDIyNjEzMDQwMFoXDTI3MDIyNjEzMDQwMFqgLzAtMAoGA1UdFAQDAgEBMB8GA1UdIwQYMBaAFCJlDNZanTSJ84O0lVK/UBs5JwasMAoGCCqGSM49BAMCA0kAMEYCIQDCUu1Zx5W6KxFJakqZdYu4y8OAoeu7CGW+afLEs4u2QAIhAJp9iwNgKp7i1iMi11kWbWkz0k2d+gGrP95FIGkdcVvX";
+
 const INTEL_SGX_PCK_CERTIFICATE = `-----BEGIN CERTIFICATE-----
 MIICljCCAj2gAwIBAgIVAJVvXc29G+HpQEnJ1PQzzgFXC95UMAoGCCqGSM49BAMC
 MGgxGjAYBgNVBAMMEUludGVsIFNHWCBSb290IENBMRowGAYDVQQKDBFJbnRlbCBD
@@ -68,19 +73,16 @@ const checkCRLValidity = (name) => {
   return true;
 };
 
-const checkCRL = async (name, pem, url) => {
-  // TODO proxy CRLs to fix CORS
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    return importPEM(pem);
-  }
-
+const checkCRL = async (name, pem, url, preloadedCRLData) => {
   if (!checkCRLValidity(name)) {
+    let crlData;
+    if (preloadedCRLData) {
+      crlData = preloadedCRLData;
+    } else {
+      crlData = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    }
     crls[name] = new CertificateRevocationList({
-      schema: fromBER(
-        new Uint8Array(
-          await (await fetch(url)).arrayBuffer()
-        )
-      ).result,
+      schema: fromBER(crlData).result,
     });
   }
 
@@ -96,7 +98,7 @@ const checkCRL = async (name, pem, url) => {
 
   const verified = await crl.verify({ issuerCertificate: certificate });
   if (!verified) {
-    return new Error("Could not verify CRLs");
+    return new Error("Could not verify CRL signature");
   }
 
   return certificate;
@@ -464,23 +466,11 @@ async function checkSignature(signature) {
   // Download and verify the CRL
   try {
     if (!checkCRLValidity("INTEL_SGX_PCK_CRL")) {
-      let crlData;
-
-      // Check if running in browser
-      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-        // Browser environment - require uploaded CRL
-        if (!window.uploadedCRL) {
-          return new Error("CRL not uploaded. Please download and upload the CRL file first.");
-        }
-        crlData = window.uploadedCRL;
-      } else {
-        // Node.js environment - fetch from Intel
-        const crlDER = await fetch("https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der");
-        crlData = new Uint8Array(await crlDER.arrayBuffer());
+      if (!window.uploadedCRL) {
+        return new Error("CRL not available. Please download and upload the CRL file first.");
       }
-
       crls["INTEL_SGX_PCK_CRL"] = new CertificateRevocationList({
-        schema: fromBER(crlData).result,
+        schema: fromBER(window.uploadedCRL).result,
       });
     }
 
@@ -546,11 +536,12 @@ export default async (
     return Error(`Missing QE report certification data certificate chain.`);
   }
 
-  // Verify validity of root certificates
+  // Verify CRL signatures against Intel certificates
   const intelRootCA = await checkCRL(
     "INTEL_ROOT_CA",
     INTEL_ROOT_CA,
-    "https://certificates.trustedservices.intel.com/IntelSGXRootCA.der",
+    "https://certificates.trustedservices.intel.com/IntelSGXRootCA.crl",
+    window.uploadedRootCRL || fromBase64(INTEL_ROOT_CA_CRL_B64),
   );
   if (intelRootCA instanceof Error) {
     return intelRootCA;
@@ -559,6 +550,7 @@ export default async (
     "INTEL_SGX_PCK_CERTIFICATE",
     INTEL_SGX_PCK_CERTIFICATE,
     "https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der",
+    window.uploadedCRL,
   );
   if (intelSGXPCKCertificate instanceof Error) {
     return intelSGXPCKCertificate

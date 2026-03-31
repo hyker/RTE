@@ -15,9 +15,12 @@ if (rtmr2El) {
   rtmr2El.textContent = EXPECTED_RTMR2;
 }
 
-// Global storage for uploaded CRL — pre-load from VM-fetched CRL if available
+// Global storage for uploaded CRLs — pre-load from VM-fetched CRLs if available
 window.uploadedCRL = window.EMBEDDED_CRL
   ? Uint8Array.from(atob(window.EMBEDDED_CRL), c => c.charCodeAt(0))
+  : null;
+window.uploadedRootCRL = window.EMBEDDED_ROOT_CRL
+  ? Uint8Array.from(atob(window.EMBEDDED_ROOT_CRL), c => c.charCodeAt(0))
   : null;
 
 

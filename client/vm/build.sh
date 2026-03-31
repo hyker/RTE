@@ -232,15 +232,26 @@ write_files:
     permissions: '0755'
     content: |
       #!/bin/bash
-      CRL_URL="https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der"
+      PCK_CRL_URL="https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der"
+      ROOT_CRL_URL="https://certificates.trustedservices.intel.com/IntelSGXRootCA.crl"
       TMP=$(mktemp)
-      curl -sf "$CRL_URL" -o "$TMP"
+
+      # PCK Platform CRL
+      curl -sf "$PCK_CRL_URL" -o "$TMP"
       if [ -s "$TMP" ]; then
           CRL_B64=$(base64 -w 0 "$TMP")
           CRL_DATE=$(openssl crl -in "$TMP" -inform DER -noout -lastupdate 2>/dev/null | sed 's/lastUpdate=//')
           printf 'window.EMBEDDED_CRL = "%s";\n' "$CRL_B64" > /var/www/html/crl.js
           printf 'window.EMBEDDED_CRL_DATE = "%s";\n' "$CRL_DATE" >> /var/www/html/crl.js
       fi
+
+      # Intel Root CA CRL
+      curl -sf "$ROOT_CRL_URL" -o "$TMP"
+      if [ -s "$TMP" ]; then
+          ROOT_B64=$(base64 -w 0 "$TMP")
+          printf 'window.EMBEDDED_ROOT_CRL = "%s";\n' "$ROOT_B64" >> /var/www/html/crl.js
+      fi
+
       rm -f "$TMP"
 
   - path: /etc/systemd/system/update-crl.service
