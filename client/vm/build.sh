@@ -245,10 +245,10 @@ write_files:
           printf 'window.EMBEDDED_CRL_DATE = "%s";\n' "$CRL_DATE" >> /var/www/html/crl.js
       fi
 
-      # Intel Root CA CRL
+      # Intel Root CA CRL (served as PEM, convert to DER for the verifier)
       curl -sf "$ROOT_CRL_URL" -o "$TMP"
       if [ -s "$TMP" ]; then
-          ROOT_B64=$(base64 -w 0 "$TMP")
+          ROOT_B64=$(openssl crl -in "$TMP" -inform PEM -outform DER 2>/dev/null | base64 -w 0)
           printf 'window.EMBEDDED_ROOT_CRL = "%s";\n' "$ROOT_B64" >> /var/www/html/crl.js
       fi
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Restricted and Trusted Environment (RTE) Client</title>
+    <title>Local Client for the Restricted and Trusted Environment (RTE)</title>
     <style>
         * {
             box-sizing: border-box;
@@ -49,7 +49,7 @@
             transition: opacity 0.3s ease;
         }
 
-        .section.hidden {
+        .hidden {
             display: none;
         }
 
@@ -413,62 +413,64 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Restricted and Trusted Environment (RTE)</h1>
+            <h1>Local Client for the Restricted and Trusted Environment (RTE)</h1>
         </div>
 
-        <div class="transparency-notice">
-            <div class="transparency-notice-header">
-                <svg class="transparency-notice-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2a9d8f" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="16" x2="12" y2="12"/>
-                    <line x1="12" y1="8" x2="12.01" y2="8"/>
-                </svg>
-                <div>
-                    This client runs entirely in your browser &mdash; all verification and encryption happen locally on your device.
-                    You can inspect the source:
-                    <a class="source-link" href="browser-client.js" target="_blank">browser-client.js</a>,
-                    <a class="source-link" href="tdx-quote-verifier.js" target="_blank">tdx-quote-verifier.js</a>,
-                    <a class="source-link" href="utils.js" target="_blank">utils.js</a>
-                    <br>
-                    <button class="transparency-notice-toggle" onclick="document.getElementById('transparencyDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
-                </div>
-            </div>
-            <div class="transparency-notice-detail" id="transparencyDetail">
-                The security of this system depends on the integrity of this client code.
-                If you do not fully trust the server delivering these files, you should
-                audit the source yourself or compare it against a known-good copy before proceeding.
-                The full project source is available at
-                <a class="source-link" href="https://github.com/hyker/RTE" target="_blank">github.com/hyker/RTE</a>.
-                The served files
-                <a class="source-link" href="browser-client.js" target="_blank">browser-client.js</a>,
-                <a class="source-link" href="tdx-quote-verifier.js" target="_blank">tdx-quote-verifier.js</a>, and
-                <a class="source-link" href="utils.js" target="_blank">utils.js</a>
-                are the un-bundled originals &mdash;
-                <a class="source-link" href="bundle.js" target="_blank">bundle.js</a>
-                is produced from them using esbuild and can be reproduced from the project source.
-            </div>
+    </div><!-- close .container temporarily -->
+
+    <div style="background: #2a9d8f; color: #fff; text-align: center; font-size: 18px; padding: 24px 28px; margin-bottom: 20px;">
+        <div>
+            This client runs <strong>entirely locally</strong> on your device &mdash; all <strong>verifications</strong> and <strong>encryption</strong> happen in your browser.
+            <br><br>
+            <span style="font-size: 13px;">
+                You can inspect the source:
+                <a class="source-link" href="browser-client.js" target="_blank" style="color: #d0f0ec;">browser-client.js</a>,
+                <a class="source-link" href="tdx-quote-verifier.js" target="_blank" style="color: #d0f0ec;">tdx-quote-verifier.js</a>,
+                <a class="source-link" href="utils.js" target="_blank" style="color: #d0f0ec;">utils.js</a>
+            </span>
+            <br>
+            <button class="transparency-notice-toggle" onclick="document.getElementById('transparencyDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';" style="color: #d0f0ec;">More info</button>
         </div>
+        <div class="transparency-notice-detail" id="transparencyDetail" style="border-top-color: rgba(255,255,255,0.3); color: #e0f5f2; font-size: 14px; text-align: left; max-width: 700px; margin: 0 auto;">
+            The security of this system depends on the integrity of this client code.
+            If you do not fully trust the server delivering these files, you should
+            audit the source yourself or compare it against a known-good copy before proceeding.
+            The full project source is available at
+            <a class="source-link" href="https://github.com/hyker/RTE" target="_blank" style="color: #d0f0ec;">github.com/hyker/RTE</a>.
+            The served files
+            <a class="source-link" href="browser-client.js" target="_blank" style="color: #d0f0ec;">browser-client.js</a>,
+            <a class="source-link" href="tdx-quote-verifier.js" target="_blank" style="color: #d0f0ec;">tdx-quote-verifier.js</a>, and
+            <a class="source-link" href="utils.js" target="_blank" style="color: #d0f0ec;">utils.js</a>
+            are the un-bundled originals &mdash;
+            <a class="source-link" href="bundle.js" target="_blank" style="color: #d0f0ec;">bundle.js</a>
+            is produced from them using esbuild and can be reproduced from the project source.
+        </div>
+    </div>
+
+    <div class="container"><!-- re-open .container -->
+
+        <h2 style="font-size: 18px; font-weight: 600; color: #333; margin: 28px 0 16px;">Remote attestation of the RTE Server</h2>
 
         <!-- CRL info box (shown instead of manual CRL steps when CRL is pre-fetched by VM) -->
-        <div class="transparency-notice hidden" id="crlInfo">
-            <div class="transparency-notice-header">
-                <svg class="transparency-notice-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2a9d8f" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <div>
-                    <strong>Certificate Revocation List (CRL)</strong> &mdash;
-                    Intel's CRL is needed to verify the TDX attestation quote.
-                    It is served by this server, which pre-fetches it from Intel periodically.
-                    Its authenticity is verified cryptographically as part of the quote verification below.
-                    <br>
-                    <button class="transparency-notice-toggle" onclick="document.getElementById('crlDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
-                </div>
+        <div class="section hidden" id="crlInfo">
+            <div class="section-title">Certificate Revocation List (CRL)</div>
+            <p style="font-size: 14px; color: #555; margin-bottom: 8px;">
+                CRL pre-fetched from Intel from
+                <a class="source-link" href="https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der" target="_blank">api.trustedservices.intel.com</a>
+            </p>
+            <div style="font-size: 14px; color: #555; margin-bottom: 4px;">
+                Last update: <span id="crlDate" style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px;">—</span>
             </div>
+            <div style="font-size: 14px; color: #555; margin-bottom: 12px;">
+                SHA-256: <span id="crlHash" style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 12px; word-break: break-all;">—</span>
+            </div>
+            <button class="transparency-notice-toggle" onclick="document.getElementById('crlDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
             <div class="transparency-notice-detail" id="crlDetail">
-                <div style="margin-bottom: 8px;">Last Update: <span id="crlDate" style="font-family: monospace;">—</span></div>
-                <div>
-                    <a class="source-link" href="https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der" target="_blank">Download CRL directly from Intel</a>
-                </div>
+                Intel maintains a Certificate Revocation List (CRL) containing information about
+                compromised TDX hardware. The security of the RTE depends on Intel TDX,
+                and this client needs to check that the server you are communicating with
+                is not on Intel's CRL. The client verifies the CRL's digital signature
+                against Intel's certificate to ensure it has not been tampered with.
             </div>
         </div>
 
@@ -509,24 +511,33 @@
             <div class="file-list" id="crlFileList"></div>
         </div>
 
-        <!-- Verify Quote -->
+        <!-- Server verification -->
         <div class="section hidden" id="step3">
-            <div class="section-title">Verify Quote</div>
-            <p style="margin-bottom: 12px; font-size: 14px; color: #555;">
-                This verifies the authenticity of the remote server by fetching and checking its TDX attestation quote.
-                The verification confirms two things: that the server is running inside a genuine Intel TDX trusted execution environment,
-                and that the code running inside it matches the expected measurement (RTMR2).
+            <div class="section-title">Server verification</div>
+            <p style="margin-bottom: 8px; font-size: 14px; color: #555;">
+                This validates the quote received from the remote RTE server to <strong>verify the RTE's authenticity and integrity</strong>.
             </p>
+            <div style="font-size: 14px; color: #555; margin-bottom: 12px;">
+                Expected ID: <span id="expectedRtmr2" style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 12px; word-break: break-all;">—</span>
+            </div>
             <button class="transparency-notice-toggle" onclick="document.getElementById('rtmr2Detail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
             <div class="transparency-notice-detail" id="rtmr2Detail" style="margin-top: 0; padding-top: 12px;">
-                <div style="margin-bottom: 8px;">
-                    Expected RTMR2: <span id="expectedRtmr2" style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 12px; word-break: break-all;">—</span>
-                </div>
-                <p style="margin: 0;">
-                    The RTMR2 value is a measurement of the code running inside the TDX enclave.
-                    This expected value is embedded in this client at build time.
-                    If you do not trust this server, you should obtain the expected RTMR2 from a trusted channel
-                    and compare it with the value shown above.
+                <p style="margin: 0 0 12px 0;">The verification confirms two things:</p>
+                <ul style="margin: 0 0 12px 20px; padding: 0;">
+                    <li style="margin-bottom: 4px;"><strong>Authenticity:</strong> that the server is running inside a genuine Intel TDX trusted execution environment.</li>
+                    <li><strong>Integrity:</strong> that the code running inside it has not been tampered with.</li>
+                </ul>
+                <p style="margin: 0 0 12px 0;">
+                    Authenticity is guaranteed by a digital signature from a private key unique to the specific CPU, authenticated by Intel.
+                </p>
+                <p style="margin: 0 0 12px 0;">
+                    Integrity is guaranteed by comparing the unique ID in the remote server's quote with the expected ID embedded in this client.
+                </p>
+                <p style="margin: 0 0 12px 0; padding: 12px; background: #fff8e1; border-radius: 6px; border: 1px solid #ffe082;">
+                    <strong>Important note:</strong> The expected ID is embedded in this client and is critical to guarantee the RTE server is legitimate. If you do not trust the server that you loaded this client from, then you should obtain the expected ID from a trusted channel and compare it with the value shown above.
+                </p>
+                <p style="margin: 0; font-size: 12px; color: #666;">
+                    <strong>Technical note:</strong> As server ID, we use the RTMR2 value contained in the TDX quote. RTMR2 measures the full boot chain (kernel, initramfs, bootloader configuration), which includes the dm-verity root hash of the filesystem. This means the RTMR2 value transitively covers the entire service — both the boot chain and all application code — ensuring the ID is cryptographically bound to every component running inside the enclave.
                 </p>
             </div>
             <div style="margin-top: 16px;">
@@ -539,13 +550,15 @@
             </div>
         </div>
 
+        <h2 class="hidden" id="testJobHeader" style="font-size: 18px; font-weight: 600; color: #333; margin: 28px 0 16px;">Test Job</h2>
+
         <!-- Upload Test Job -->
         <div class="section hidden" id="step4">
-            <div class="section-title">Upload Test Job</div>
 
             <div id="testConfigSection">
+                <div class="section-title">Test Configuration</div>
                 <label style="font-size: 13px; color: #555; display: block; margin-bottom: 8px;">
-                    Test Configuration (JSON)
+                    Configuration (JSON)
                 </label>
                 <textarea id="testConfig"
                           class="text-input"
@@ -567,12 +580,10 @@
                 <div class="divider"></div>
             </div>
 
-            <label style="font-size: 13px; color: #555; display: block; margin-bottom: 4px;">
-                TOE File (Target of Evaluation)
-            </label>
+            <div class="section-title">TOE File (Target of Evaluation)</div>
             <div style="font-size: 13px; color: #555; line-height: 1.6; margin-bottom: 12px;">
                 Your file will be encrypted locally on your device before upload.
-                It can only be decrypted inside the verified trusted enclave &mdash; no one else can access it, not even us.
+                It can only be decrypted inside the verified trusted enclave &mdash; <strong>no one else can access it, not even us</strong>.
                 <br>
                 <button class="transparency-notice-toggle" onclick="document.getElementById('encryptionDetail').classList.toggle('open'); this.textContent = this.textContent === 'More info' ? 'Less info' : 'More info';">More info</button>
             </div>
@@ -615,6 +626,7 @@
         window.currentStep = 1;
 
         function showStep(stepNum) {
+            const testJobHeader = document.getElementById('testJobHeader');
             for (let i = 1; i <= 4; i++) {
                 const el = document.getElementById('step' + i);
                 // Always hide steps 1 & 2 when CRL is pre-fetched
@@ -633,6 +645,8 @@
                     el.classList.remove('completed');
                 }
             }
+            // Show Test Job header whenever step 4 is visible
+            testJobHeader.classList.toggle('hidden', document.getElementById('step4').classList.contains('hidden'));
             window.currentStep = stepNum;
         }
 

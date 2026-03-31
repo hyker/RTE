@@ -23,6 +23,18 @@ window.uploadedRootCRL = window.EMBEDDED_ROOT_CRL
   ? Uint8Array.from(atob(window.EMBEDDED_ROOT_CRL), c => c.charCodeAt(0))
   : null;
 
+// Display CRL SHA-256 hash in the UI
+if (window.uploadedCRL) {
+  crypto.subtle.digest('SHA-256', window.uploadedCRL).then(hash => {
+    const hashEl = document.getElementById('crlHash');
+    if (hashEl) {
+      hashEl.textContent = Array.from(new Uint8Array(hash))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase();
+    }
+  });
+}
 
 // Global storage for extracted public key
 window.extractedPublicKey = null;
