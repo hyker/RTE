@@ -27,7 +27,7 @@ The assessor selects the appropriate tool and parameters when setting up the eva
 
 ## How it works — overview
 
-1. You start from the **Custodes platform** and click the button "Execute RTE" to run an RTE analysis.
+1. You start from the **Custodes platform** and click the button "Execute RTE tool" to run an RTE analysis.
 2. A new window opens with the **RTE client** — a lightweight web page that handles verification and upload.
 3. The RTE client **verifies the secure environment** to confirm it is genuine and untampered.
 4. You **review the test configuration**, then **select your file and upload it**.
@@ -42,19 +42,15 @@ The entire verification and upload process typically takes under a minute. The u
 
 ### Getting started
 
-From the Custodes platform, click **"Execute RTE"**. A new browser window will open with the RTE client.
+From the Custodes platform, click **"Execute RTE tool"**. A new browser window will open with the RTE client.
 
 <!-- Screenshot: Custodes platform showing the "Execute RTE tool" button -->
-
-The RTE client window has a green banner at the top explaining that all verification and encryption happens locally in your browser. The tool and parameters for your analysis have been pre-selected by the Custodes platform.
-
-<!-- Screenshot: RTE client window after opening, showing the green banner -->
 
 ### Step 0: Review the client code
 
 At the top of the RTE client window, a green banner confirms that all verification and encryption runs locally in your browser. It also provides links to inspect the source code files (`browser-client.js`, `tdx-quote-verifier.js`, `utils.js`) and a link to the full [public repository on GitHub](https://github.com/hyker/RTE).
 
-If you want additional assurance, you have the option to click **"More info"** in the banner to see auditing guidance. You can compare the served files against the public repository to confirm nothing has been modified. The bundled file (`bundle.js`) is produced from the source files using esbuild and can be reproduced from the project source.
+You have the option to click **"More info"** in the banner to see auditing guidance. You can compare the served files against the public repository to confirm nothing has been modified. The bundled file (`bundle.js`) is produced from the source files using esbuild and can be reproduced from the project source.
 
 <!-- Screenshot: Green banner with "More info" expanded, showing source links and auditing guidance -->
 
@@ -88,7 +84,7 @@ Before uploading, review the test configuration shown on screen. It shows which 
 
 The configuration is pre-filled by the Custodes platform. **Take a moment to confirm it matches what you expect.** The RTE guarantees that your file will be processed in a secure, isolated environment — but the specific analysis tool is a third-party program. You should be comfortable with the tool that has been selected.
 
-> **Note:** The RTE does not audit or endorse any specific tool. It provides the secure environment; you (or the Custodes platform on your behalf) choose which tool runs on your data.
+> **Note:** The RTE does not audit the available tools. It provides the secure environment; you (or your choosen assessor through the Custodes platform) choose which tool runs on your data.
 
 ### Step 3: Select your file and upload
 
@@ -102,7 +98,7 @@ When you click upload, the following happens automatically in your browser (befo
 
 - Your file is **read entirely on your device**.
 - It is **encrypted** using a key that only the verified secure environment can use. No one intercepting the data in transit or on the server can read it.
-- The encrypted file is then **sent to the server** for processing.
+- The encrypted file is then **sent to the secure enclave** for processing.
 
 <!-- Screenshot: Upload in progress or completed -->
 
