@@ -195,7 +195,7 @@ function showJobId(outputEl, jobId) {
       <div class="job-id-label">Job ID</div>
       <div class="job-id-value">${jobId}</div>
     </div>
-    <div style="margin-top: 16px; text-align: center;">
+    <div style="margin-top: 10px; text-align: center;">
       <button class="btn btn-secondary" onclick="window.close()">Close Window</button>
     </div>
   `;
