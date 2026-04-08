@@ -34,7 +34,7 @@ The assessor selects the appropriate tool and parameters when setting up the eva
 5. Your file is **encrypted in your browser** and sent to the secure environment.
 6. The analysis runs. When finished, **results appear in the Custodes platform**.
 
-The entire upload and verification process typically takes under a minute. The analysis time depends on the tool and file size.
+The entire verification and upload process typically takes under a minute. The upload and analysis time depends on the tool and file size.
 
 ---
 
@@ -42,11 +42,11 @@ The entire upload and verification process typically takes under a minute. The a
 
 ### Getting started
 
-From the Custodes platform, click **"Execute RTE"** (or the equivalent button for your evaluation). A new browser window will open with the RTE client.
+From the Custodes platform, click **"Execute RTE"**. A new browser window will open with the RTE client.
 
-<!-- Screenshot: Custodes platform showing the "Execute RTE" button -->
+<!-- Screenshot: Custodes platform showing the "Execute RTE tool" button -->
 
-The RTE client window has a green banner at the top confirming that all verification and encryption happens locally in your browser. The tool and parameters for your analysis have been pre-selected by the Custodes platform.
+The RTE client window has a green banner at the top explaining that all verification and encryption happens locally in your browser. The tool and parameters for your analysis have been pre-selected by the Custodes platform.
 
 <!-- Screenshot: RTE client window after opening, showing the green banner -->
 
