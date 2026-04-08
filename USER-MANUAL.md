@@ -27,7 +27,7 @@ The assessor selects the appropriate tool and parameters when setting up the eva
 
 ## How it works — overview
 
-1. You start from the **Custodes platform** and click the button to run an RTE analysis.
+1. You start from the **Custodes platform** and click the button "Execute RTE" to run an RTE analysis.
 2. A new window opens with the **RTE client** — a lightweight web page that handles verification and upload.
 3. The RTE client **verifies the secure environment** to confirm it is genuine and untampered.
 4. You **review the test configuration**, then **select your file and upload it**.
