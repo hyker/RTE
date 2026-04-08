@@ -113,6 +113,7 @@ The Custodes platform will automatically retrieve and display the analysis resul
 The results include:
 
 - The **output of the analysis tool** (findings, warnings, etc.).
+- The **tool name** and **parameters** of the test.
 - A **cryptographic proof** that the results were produced inside the verified secure environment and have not been modified.
 - A **hash of your original file**, linking the results to the specific file you uploaded.
 
@@ -124,7 +125,7 @@ You do not need to understand the technical details to use the RTE, but here is 
 
 | Protection | What it means for you |
 |-----------|----------------------|
-| **Hardware isolation** | Your file is processed inside a sealed hardware environment. No one — not the server operator, not the cloud provider — can see or modify what happens inside. |
+| **Hardware isolation** | Your file is processed inside an isolated hardware environment. No one — not the server operator, not the cloud provider — can see or modify what happens inside. |
 | **Pre-upload verification** | Before you upload anything, the system cryptographically proves it is genuine and running the expected software. |
 | **Browser-side encryption** | Your file is encrypted on your device before it leaves your browser. Only the verified secure environment can decrypt it. |
 | **Signed results** | The analysis output is digitally signed inside the secure environment, so tampering with results after the fact is detectable. |
@@ -137,7 +138,7 @@ You do not need to understand the technical details to use the RTE, but here is 
 The client will block you from proceeding. A verification failure means the secure environment could not be confirmed as genuine. This could be caused by a temporary server issue, a network problem, or (in rare cases) a genuine security concern. Try again after a few minutes. If the problem persists, contact support.
 
 **Verification shows FAIL with an identity mismatch**
-This means the software running on the server does not match the expected version. The client will **block you from proceeding** — you cannot override this. This can happen legitimately if the server has been updated but the client has not yet been refreshed to match. Contact the service maintainer to confirm whether a legitimate update occurred. If it was not a planned update, the client will not allow you to proceed.
+This means the software running on the server does not match the expected version. The client will **block you from proceeding** — you cannot override this. This can happen legitimately if the server has been updated but the client has not yet been refreshed to match. Contact the service maintainer to confirm whether a legitimate update occurred.
 
 **Upload section is not visible**
 The upload step only appears after verification passes (green PASS). If you do not see the file upload area, complete the verification step first.
