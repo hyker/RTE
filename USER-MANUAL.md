@@ -2,7 +2,7 @@
 
 ## What is the RTE?
 
-The **Restricted and Trusted Environment (RTE)** is a secure analysis service integrated into the Custodes platform. It allows you to submit files for automated security analysis while guaranteeing that **no one — not even the service operator — can access your files or tamper with the results**.
+The **Restricted and Trusted Environment (RTE)** is a secure analysis service integrated into the CUSTODES platform. It allows you to submit files for automated security analysis while guaranteeing that **no one — not even the service operator — can access your files or tamper with the results**.
 
 Whether you are a **vendor** submitting your product for evaluation, or an **assessor** reviewing the results, the RTE provides guarantees tailored to your role:
 
@@ -21,18 +21,18 @@ You do not need to install any software. The entire process runs in your web bro
 | **binwalk** | Analyzes, reverse-engineers, and extracts the contents of firmware images and other binary blobs (filesystems, compressed archives, embedded executables). | [github.com/ReFirmLabs/binwalk](https://github.com/ReFirmLabs/binwalk) |
 | **aeskeyfind** | Scans a binary file or memory dump for AES key schedules, helping locate cryptographic key material left in memory. | [citp.princeton.edu/our-work/memory](https://citp.princeton.edu/our-work/memory/) |
 
-The assessor selects the appropriate tool and parameters when setting up the evaluation in the Custodes platform. As the vendor uploading a TOE, you can review which tool and parameters have been chosen before uploading (see [Step 2](#step-2-review-the-test-configuration)).
+The assessor selects the appropriate tool and parameters when setting up the evaluation in the CUSTODES platform. As the vendor uploading a TOE, you can review which tool and parameters have been chosen before uploading (see [Step 2](#step-2-review-the-test-configuration)).
 
 ---
 
 ## How it works — overview
 
-1. You start from the **Custodes platform** and click the button "Execute RTE tool" to run an RTE analysis.
+1. You start from the **CUSTODES platform** and click the button "Execute RTE tool" to run an RTE analysis.
 2. A new window opens with the **RTE client** — a lightweight web page that handles verification and upload.
 3. The RTE client **verifies the secure environment** to confirm it is genuine and untampered.
 4. You **review the test configuration**, then **select your file and upload it**.
 5. Your file is **encrypted in your browser** and sent to the secure environment.
-6. The analysis runs. When finished, **results appear in the Custodes platform**.
+6. The analysis runs. When finished, **results appear in the CUSTODES platform**.
 
 The entire verification and upload process typically takes under a minute. The upload and analysis time depends on the tool and file size.
 
@@ -42,9 +42,9 @@ The entire verification and upload process typically takes under a minute. The u
 
 ### Getting started
 
-From the Custodes platform, click **"Execute RTE tool"**. A new browser window will open with the RTE client.
+From the CUSTODES platform, click **"Execute RTE tool"**. A new browser window will open with the RTE client.
 
-<!-- Screenshot: Custodes platform showing the "Execute RTE tool" button -->
+<!-- Screenshot: CUSTODES platform showing the "Execute RTE tool" button -->
 
 ### Step 0: Review the client code
 
@@ -82,9 +82,9 @@ Before uploading, review the test configuration shown on screen. It shows which 
 
 <!-- Screenshot: Test configuration section showing tool name and parameters -->
 
-The configuration is pre-filled by the Custodes platform. **Take a moment to confirm it matches what you expect.** The RTE guarantees that your file will be processed in a secure, isolated environment — but the specific analysis tool is a third-party program. You should be comfortable with the tool that has been selected.
+The configuration is pre-filled by the CUSTODES platform. **Take a moment to confirm it matches what you expect.** The RTE guarantees that your file will be processed in a secure, isolated environment — but the specific analysis tool is a third-party program. You should be comfortable with the tool that has been selected.
 
-> **Note:** The RTE does not audit the available tools. It provides the secure environment; you (or your choosen assessor through the Custodes platform) choose which tool runs on your data.
+> **Note:** The RTE does not audit the available tools. It provides the secure environment; you (or your choosen assessor through the CUSTODES platform) choose which tool runs on your data.
 
 ### Step 3: Select your file and upload
 
@@ -104,11 +104,11 @@ When you click upload, the following happens automatically in your browser (befo
 
 ### Step 4: Wait for results
 
-After a successful upload, the RTE client shows **"Upload complete"**. You can close this window and return to the Custodes platform.
+After a successful upload, the RTE client shows **"Upload complete"**. You can close this window and return to the CUSTODES platform.
 
 <!-- Screenshot: "Upload complete" confirmation -->
 
-The Custodes platform will automatically retrieve and display the analysis results once processing is finished. Processing time depends on the tool and the size of your file, but most analyses complete within a few minutes.
+The CUSTODES platform will automatically retrieve and display the analysis results once processing is finished. Processing time depends on the tool and the size of your file, but most analyses complete within a few minutes.
 
 The results include:
 
@@ -144,9 +144,9 @@ This means the software running on the server does not match the expected versio
 The upload step only appears after verification passes (green PASS). If you do not see the file upload area, complete the verification step first.
 
 **Upload fails with an error**
-Check your internet connection and try again. If the error mentions "Tool or parameter not allowed", the test configuration contains a tool or setting the server does not accept — contact the Custodes platform administrator.
+Check your internet connection and try again. If the error mentions "Tool or parameter not allowed", the test configuration contains a tool or setting the server does not accept — contact the CUSTODES platform administrator.
 
-**Results are not appearing on the Custodes platform**
+**Results are not appearing on the CUSTODES platform**
 Analysis may still be in progress. Most tools complete within a few minutes, but larger files or more complex analyses may take longer. If results have not appeared after 15 minutes, contact support.
 
 ---
@@ -168,7 +168,7 @@ Because the local file cannot connect to the server to pre-fetch certain data, y
 
 This method gives you full control over the code running in your browser — you can audit every line before proceeding. The full project source is available at [github.com/hyker/RTE](https://github.com/hyker/RTE).
 
-> **Note:** This method is provided for transparency and audit purposes. For normal use within the Custodes platform, the online version is recommended.
+> **Note:** This method is provided for transparency and audit purposes. For normal use within the CUSTODES platform, the online version is recommended.
 
 
 
@@ -244,9 +244,9 @@ Download the client files from the GitHub repository and open `index.html` direc
 
 ---
 
-## Using the client from Custodes Main Platform
+## Using the client from CUSTODES Main Platform
 
-The most common way to reach the RTE client is by being redirected from the **Custodes main platform**. In this flow:
+The most common way to reach the RTE client is by being redirected from the **CUSTODES main platform**. In this flow:
 
 **TODO**
  * redo this with actual images
@@ -254,11 +254,11 @@ The most common way to reach the RTE client is by being redirected from the **Cu
  * andreas.tsigkos@maggioli.gr
  * bullet list below is too technical, end-user don't care about JobID and polling, etc.
 
-1. You click a button on the Custodes platform (Execute RTE).
+1. You click a button on the CUSTODES platform (Execute RTE).
 2. A new window opens with the RTE client at `rteverif.xyz`, pre-configured with the analysis tool and parameters chosen on the platform.
 3. You verify the enclave and upload your file (described in the steps below).
-4. When the upload completes, the RTE client automatically sends the **Job ID** back to the Custodes platform via a secure browser message (`postMessage`), and you can close the upload window.
-5. The Custodes platform uses the Job ID to poll for and display your results.
+4. When the upload completes, the RTE client automatically sends the **Job ID** back to the CUSTODES platform via a secure browser message (`postMessage`), and you can close the upload window.
+5. The CUSTODES platform uses the Job ID to poll for and display your results.
 
 In this flow, the **test configuration is pre-filled and locked** — you cannot change which tool runs or its parameters, because the platform has already decided that for you. You only need to verify the enclave and upload your file.
 
@@ -267,7 +267,7 @@ In this flow, the **test configuration is pre-filled and locked** — you cannot
 **TODO**
 Remove this part, not applicable to Pilot3.
 
-If you navigate to `https://rteverif.xyz:8445/index.html` yourself (not from the Custodes platform):
+If you navigate to `https://rteverif.xyz:8445/index.html` yourself (not from the CUSTODES platform):
 
 1. The test configuration field is **editable** — you choose which tool to run and with what parameters.
 2. After upload, the **Job ID is displayed directly** in the client window (since there is no parent platform to receive it).
@@ -318,10 +318,10 @@ If verification passes, you will see a green **PASS** indicator. If it fails, yo
 
 ### Step 3: Configure the test
 
-> **Note:** If you arrived from the Custodes platform, this section is pre-filled and read-only. Skip to Step 4.
+> **Note:** If you arrived from the CUSTODES platform, this section is pre-filled and read-only. Skip to Step 4.
 
 **TODO**
- * even if coming from custodes main platform, dont trust the test paramters, verify them
+ * even if coming from CUSTODES main platform, dont trust the test paramters, verify them
 
 The test configuration is a JSON object specifying which tool to run and its parameters. For example:
 
@@ -358,7 +358,7 @@ The encryption ensures that your data can **only** be decrypted inside the verif
 
 After a successful upload, you receive a **Job ID** — a random identifier for your analysis job.
 
-- **If opened from the Custodes platform:** The Job ID is sent back to the platform automatically, and the client shows "Upload complete". You can close the window.
+- **If opened from the CUSTODES platform:** The Job ID is sent back to the platform automatically, and the client shows "Upload complete". You can close the window.
 - **If opened directly:** The Job ID is displayed prominently on screen. Save it — you will need it to retrieve your results.
 
 <!-- Screenshot: Job ID displayed after upload -->
@@ -367,7 +367,7 @@ After a successful upload, you receive a **Job ID** — a random identifier for 
 
 ## Retrieving results
 
-If you are using the Custodes platform, results are retrieved and displayed automatically.
+If you are using the CUSTODES platform, results are retrieved and displayed automatically.
 
 If you uploaded directly, you can retrieve results by calling the `/result` endpoint:
 
