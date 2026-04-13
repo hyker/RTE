@@ -452,9 +452,8 @@
 
         <!-- CRL info box (shown instead of manual CRL steps when CRL is pre-fetched by VM) -->
         <div class="section hidden" id="crlInfo">
-            <div class="section-title">Certificate Revocation List (CRL)</div>
             <p style="font-size: 13px; color: #555; margin-bottom: 4px;">
-                CRL pre-fetched from Intel from
+                <strong>CRL pre-fetched from Intel</strong> from
                 <a class="source-link" href="https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform&encoding=der" target="_blank">api.trustedservices.intel.com</a>
             </p>
             <div style="font-size: 12px; color: #666; margin-bottom: 2px;">
@@ -556,9 +555,6 @@
 
             <div id="testConfigSection">
                 <div class="section-title">Test Configuration</div>
-                <label style="font-size: 12px; color: #555; display: block; margin-bottom: 4px;">
-                    Configuration (JSON)
-                </label>
                 <textarea id="testConfig"
                           class="text-input"
                           placeholder='{"tool_name": "cppcheck", "parameters": []}'>{"tool_name": "cppcheck", "parameters": []}</textarea>
