@@ -116,14 +116,18 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// sign the results
+		// The signature is computed over signed_data (a string) rather than
+		// over a JSON object, because JSON object key order is unspecified:
+		// any verifier that re-serializes a parsed object could produce a
+		// different byte string and fail verification. Including signed_data
+		// verbatim in the response lets verifiers sign-check the exact bytes.
+		// quote_data is intentionally not signed — it self-authenticates via
+		// Intel's certificate chain.
+		toeHash := hashString(string(toe))
 		blob := map[string]interface{}{
-			// "jobID": payload.Identifier,
-			"status":     "done",
-			// "test": string(testSuite),
-			"test": parsedTest,
-			"results":    parsedOutput,
-			"quote_data": quote["quote_data"],
+			"toe_hash": toeHash,
+			"test":     parsedTest,
+			"results":  parsedOutput,
 		}
 
 		jsonBlobData, err := json.Marshal(blob)
@@ -131,26 +135,31 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		jsonBlobString := string(jsonBlobData)
-		signString, err := signString(jsonBlobString)
+		signedData := string(jsonBlobData)
+		signature, err := signString(signedData)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		verifData := map[string]string{
-    	"signature": signString,
-			"toe_hash":	hashString(string(toe)),
+			"signed_data": signedData,
+			"signature":   signature,
+			"toe_hash":    toeHash,
 		}
 
 		
 
-		// put signature with results and retutn them
+		// NOTE: test, results, and toe_hash are duplicated here — they are
+		// already inside signed_data (authoritative, verifiable) and also
+		// appear as top-level parsed fields. The duplication exists because
+		// the production client reads the top-level fields directly, and we
+		// cannot risk breaking it with a shape change. A future cleanup
+		// should drop the top-level copies and have the client parse
+		// signed_data as the single source of truth after verification.
 		response := map[string]interface{}{
-			// "jobID":               payload.Identifier,
 			"status":                   "done",
-			"test": parsedTest,
-			// "test":               string(testSuite),
+			"test":                     parsedTest,
 			"results":                  parsedOutput,
 			"quote_data":               quote["quote_data"],
 			"crypto_verification_data": verifData,
