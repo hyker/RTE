@@ -22,7 +22,7 @@ cppcheck, checksec, OWASP dependency-check, binwalk, aeskeyfind.
 ## Documentation
 
 See readmes in `server/` and `client/` for build and code details.
-See `USER-MANUAL.md` for a guide on using a deployed instance.
+See `client/USER-MANUAL.md` for a guide on using a deployed instance.
 
 ## Licenses
 This software is source-available under the PolyForm Strict License 1.0.0. The source is published to enable verification of remote attestation measurements. Commercial licenses and other arrangements are available — contact joakim.brorsson (at) hyker.se. Research collaborators may have separate license terms under bilateral agreement.
