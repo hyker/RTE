@@ -6,12 +6,31 @@ proprietary use.
 
 ---
 
+## Written Offer for GPL Source Code
+
+For any GPL-licensed component distributed in this software (including but
+not limited to cppcheck and OpenJDK JRE), Hyker Security AB will provide
+the complete corresponding source code on a physical medium customarily
+used for software interchange, for a charge no more than the cost of
+physically performing source distribution. Send written requests to
+joakim.brorsson (at) hyker.se.
+
+This offer is valid for at least three years from the date of distribution
+and applies to anyone in possession of this software. The source code
+provided will correspond to the exact version distributed; for unmodified
+Ubuntu packages, this is equivalent to the source available via
+`apt source <package>` on the corresponding Ubuntu release, or from the
+upstream project repository.
+
+---
+
 ## Tools distributed in the VM image
 
 ### cppcheck
 - **License:** GPL-3.0
-- **Usage:** Installed as an unmodified Ubuntu system package; invoked as a
-  standalone process. Not linked into any proprietary code.
+- **Usage:** Installed as an unmodified Ubuntu system package into the
+  attested TDX VM image; invoked at runtime as a standalone process. Not
+  linked into any proprietary code.
 - **Source:** Available from the Ubuntu package repositories
   (`apt source cppcheck`) or https://github.com/danmar/cppcheck
 
@@ -24,9 +43,10 @@ proprietary use.
 
 ### OpenJDK JRE (default-jre-headless)
 - **License:** GPL-2.0 with Classpath Exception
-- **Usage:** Installed as an unmodified Ubuntu system package. Used only as
-  the runtime for OWASP Dependency-Check. The Classpath Exception permits
-  proprietary programs to run on the JVM without triggering copyleft.
+- **Usage:** Installed as an unmodified Ubuntu system package into the
+  attested TDX VM image; invoked at runtime as the JVM for OWASP
+  Dependency-Check. The Classpath Exception permits proprietary programs
+  to run on the JVM without triggering copyleft.
 - **Source:** Available from the Ubuntu package repositories
   (`apt source openjdk-21-jre-headless`) or https://openjdk.org
 
@@ -121,7 +141,9 @@ The following tools are used during the build process but are not included
 in the final VM image or client bundle:
 
 - **Canonical TDX scripts** (GPL-3.0) — used to produce the TDX guest base
-  image; scripts run on the build host only
+  image; scripts run during image build (on host and temporarily inside the
+  guest); deleted before the image is finalized — not present in the shipped
+  image
 - **libguestfs / virt-customize** (GPL-2.0+) — used to customize VM images
   on the build host
 - **esbuild** (MIT) — JavaScript bundler; output (bundle.js) does not
