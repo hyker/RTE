@@ -184,8 +184,8 @@ func storeRequest(fileContent []byte, toeDir string) (string, error) {
 		return "", err
 	}
 
-	// Generate random file name
-	randString, err := GenerateRandomString(16)
+	// Generate random file name (22 chars over a 62-symbol alphabet ≈ 131 bits of entropy)
+	randString, err := GenerateRandomString(22)
 	if err != nil {
 		fmt.Println("Error, in file handling (1)", err)
 		return "", err
