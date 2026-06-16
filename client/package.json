@@ -1,0 +1,13 @@
+{
+  "type": "module",
+  "scripts": {
+    "build": "esbuild browser-client.js --bundle --format=iife --outfile=bundle.js"
+  },
+  "dependencies": {
+    "asn1js": "^3.0.5",
+    "pkijs": "^3.0.15"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

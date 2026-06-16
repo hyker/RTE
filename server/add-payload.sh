@@ -1,0 +1,114 @@
+#!/bin/bash
+# Script to add custodes payload to base image
+# Called from build-base.sh
+# Parameters: $1 = base image file path, $2 = debug mode (true/false), $3 = use TDX (true/false)
+
+set -e
+
+BASE_IMAGE="$1"
+DEBUG_MODE="$2"
+USE_TDX="${3:-false}"
+
+# Build custodes binary
+cd payload/custodes
+make clean
+make build
+cd ../..
+
+# Build aeskeyfind from source
+if [ ! -f "payload/custodes/tools/aeskeyfind/aeskeyfind" ]; then
+  echo "Building aeskeyfind..."
+  mkdir -p payload/custodes/tools/aeskeyfind
+  cd payload/custodes/tools/aeskeyfind
+  if [ ! -f "aeskeyfind.c" ]; then
+    git clone https://github.com/makomk/aeskeyfind .
+  fi
+  make clean
+  make
+  cd ../../../..
+fi
+
+# Build checksec binary
+cd payload/custodes/tools/checksec
+go build -o checksec .
+cd ../../../..
+
+# Download and extract dependency-check
+if [ ! -d "payload/custodes/tools/dependency-check" ]; then
+  echo "Downloading dependency-check..."
+  cd payload/custodes/tools
+  curl -Ls "https://github.com/dependency-check/DependencyCheck/releases/download/v12.1.6/dependency-check-12.1.6-release.zip" -o dependency-check.zip
+  unzip -q dependency-check.zip
+  rm dependency-check.zip
+  cd ../../..
+fi
+
+# Install custodes binary and support files
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --copy-in payload/custodes/custodes:/usr/local/bin \
+  --run-command "chmod +x /usr/local/bin/custodes"
+
+# Install cppcheck and binwalk
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --install cppcheck,binwalk
+
+# Install checksec
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --run-command "mkdir -p /opt/custodes/tools" \
+  --copy-in payload/custodes/tools/checksec:/opt/custodes/tools \
+  --run-command "chmod +x /opt/custodes/tools/checksec/checksec"
+
+# Install aeskeyfind
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --copy-in payload/custodes/tools/aeskeyfind:/opt/custodes/tools \
+  --run-command "chmod +x /opt/custodes/tools/aeskeyfind/aeskeyfind"
+
+# Install Java and dependency-check
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --install default-jre-headless \
+  --copy-in payload/custodes/tools/dependency-check:/opt/custodes/tools \
+  --run-command "chmod +x /opt/custodes/tools/dependency-check/bin/dependency-check.sh"
+
+# Build and install TDX quote generator (only for TDX builds)
+if [ "$USE_TDX" = "true" ]; then
+  sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+    --run-command "mkdir -p /opt/tdx-quote-service" \
+    --copy-in payload/tdx-quote-service/quote-generator/quote-generator.c:/tmp \
+    --run-command "gcc -Wall -O2 -o /opt/tdx-quote-service/quote-generator /tmp/quote-generator.c -ltdx_attest" \
+    --run-command "rm /tmp/quote-generator.c"
+fi
+
+# Create dedicated non-root user for the custodes service. The service binds
+# the unprivileged port 9000 and writes only to tmpfs paths it owns, so it
+# doesn't need root. TLS files and (for TDX builds) /dev/tdx_guest are made
+# readable via the custodes group below.
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --run-command "useradd --system --no-create-home --shell /usr/sbin/nologin custodes"
+
+# For TDX builds, /dev/tdx_guest defaults to root-only; grant the custodes
+# group read access so the quote-generator subprocess (running as custodes)
+# can still produce a quote.
+if [ "$USE_TDX" = "true" ]; then
+  sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+    --copy-in payload/udev/70-tdx-guest.rules:/etc/udev/rules.d
+fi
+
+# Setup custodes systemd service
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --copy-in payload/systemd/custodes.service:/etc/systemd/system \
+  --run-command "systemctl enable custodes.service"
+
+# Install TLS provisioning script and service
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --copy-in payload/tls-provision.sh:/usr/local/bin \
+  --run-command "chmod +x /usr/local/bin/tls-provision.sh" \
+  --copy-in payload/systemd/tls-provision.service:/etc/systemd/system \
+  --run-command "systemctl enable tls-provision.service"
+
+# Install TLS renewal script, service and timer
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a "$BASE_IMAGE" \
+  --copy-in payload/tls-renew.sh:/usr/local/bin \
+  --run-command "chmod +x /usr/local/bin/tls-renew.sh" \
+  --copy-in payload/systemd/tls-renew.service:/etc/systemd/system \
+  --copy-in payload/systemd/tls-renew.timer:/etc/systemd/system \
+  --run-command "systemctl enable tls-renew.timer"

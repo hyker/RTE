@@ -1,0 +1,13 @@
+[Unit]
+Description=Provision Let's Encrypt TLS certificate (Cloudflare DNS-01)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tls-provision.sh
+RemainAfterExit=yes
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
