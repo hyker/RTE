@@ -21,8 +21,6 @@
 #
 # Requires: syft, cyclonedx (cyclonedx-cli), jq, git, parted, debugfs
 #           qemu-img (only when scanning the qcow2 client VM disk)
-#   syft:         curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b ~/.local/bin
-#   cyclonedx-cli: https://github.com/CycloneDX/cyclonedx-cli/releases (binary "cyclonedx-linux-x64")
 
 set -euo pipefail
 
