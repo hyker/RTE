@@ -33,6 +33,7 @@ CLIENT_IMAGE="$ROOT/client/vm/vm-disk-prod.qcow2"
 # deb packages that belong to the analysis tools, not the RTE platform:
 # cppcheck + binwalk (add-payload.sh) and the JRE stack pulled in solely to
 # run dependency-check (default-jre-headless and its companions)
+# These need to be maintained when adding or removing tools from the RTE
 TOOL_DEB_PKGS='["cppcheck","binwalk","python3-binwalk","default-jre-headless","openjdk-21-jre-headless","java-common","ca-certificates-java"]'
 
 while [[ $# -gt 0 ]]; do
