@@ -320,6 +320,12 @@ export async function uploadTestJob() {
     const plaintextBytes = new TextEncoder().encode(JSON.stringify(payload));
     const encryptedBody = await encryptPayload(window.extractedPublicKey, plaintextBytes);
 
+    // Anti-freeloading gate: forward the navigation referrer so the server can
+    // check the request came from the main platform (which opens this client via
+    // window.open). This only meters access; it is not a confidentiality control,
+    // since the payload is end-to-end encrypted to the attested enclave.
+    encryptedBody.referrer = document.referrer;
+
     const response = await fetch(UPLOAD_SERVICE_URL, {
       method: 'POST',
       mode: 'cors',

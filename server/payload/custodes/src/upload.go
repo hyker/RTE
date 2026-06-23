@@ -37,6 +37,7 @@ type EncryptedUploadRequest struct {
 	EphemeralPubKey string `json:"ephemeral_public_key"`
 	Nonce           string `json:"nonce"`
 	Ciphertext      string `json:"ciphertext"`
+	Referrer        string `json:"referrer"`
 }
 
 func decryptUploadPayload(req EncryptedUploadRequest) ([]byte, error) {
@@ -74,6 +75,15 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
+
+	// Anti-freeloading gate (see auth.go). Guards metered access only — not
+	// confidentiality, which the end-to-end encryption to the enclave already
+	// provides. Checked before the (more expensive) decryption below.
+	if !refererAllowed(encReq.Referrer) {
+		http.Error(w, `{"status":"error","reason":"unauthorized"}`, http.StatusPaymentRequired)
+		return
+	}
+
 	plaintext, err := decryptUploadPayload(encReq)
 	if err != nil {
 		log.Printf("decryptUploadPayload: %v", err)

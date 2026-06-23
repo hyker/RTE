@@ -47,6 +47,10 @@ if [ ! -f build-config.sh ]; then
 fi
 source build-config.sh
 
+# Exported so add-payload.sh -> the custodes Makefile picks it up and bakes the
+# anti-freeloading gate origin into the binary (empty disables the gate).
+export ALLOWED_REFERRER_ORIGIN
+
 # LE staging by default (safe); only --prod uses production certs
 if [ "$MODE" = "prod" ]; then
   LE_STAGING="false"

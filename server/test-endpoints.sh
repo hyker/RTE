@@ -16,6 +16,13 @@ case $1 in
 esac
 
 BASE_URL="https://localhost:$PORT"
+
+# The anti-freeloading gate origin baked into the image at build time. Sourced
+# from the same config the build uses, so the upload tests forward the referrer
+# the running server expects and the access-control test knows if the gate is on.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ALLOWED_REFERRER_ORIGIN=""
+[ -f "$SCRIPT_DIR/build-config.sh" ] && source "$SCRIPT_DIR/build-config.sh"
 FAILED=0
 pass() { echo "  PASS: $1"; }
 fail() { echo "  FAIL: $1"; FAILED=1; }
@@ -60,6 +67,31 @@ else
   fail "no rtmr2 in response"
 fi
 
+# Test /upload access control (anti-freeloading referrer gate).
+# The gate runs before decryption, so a forged/missing referrer is rejected with
+# HTTP 402 using only a well-formed (version 1) envelope — no valid ciphertext
+# needed. The accepted-referrer path is covered by the tool tests below, which
+# forward $ALLOWED_REFERRER_ORIGIN and only succeed if the gate lets them through.
+echo "--- /upload access control ---"
+check_upload_rejected() {
+  local LABEL="$1" REFERRER="$2"
+  local CODE
+  CODE=$(curl -sk -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/upload" \
+    -H 'Content-Type: application/json' \
+    -d "{\"version\":1,\"ephemeral_public_key\":\"\",\"nonce\":\"\",\"ciphertext\":\"\",\"referrer\":\"$REFERRER\"}")
+  if [ "$CODE" = "402" ]; then
+    pass "$LABEL (HTTP 402)"
+  else
+    fail "$LABEL (expected 402, got $CODE)"
+  fi
+}
+if [ -n "$ALLOWED_REFERRER_ORIGIN" ]; then
+  check_upload_rejected "forged referrer rejected"  "https://evil.example"
+  check_upload_rejected "missing referrer rejected" ""
+else
+  echo "  SKIP: referrer gate disabled (ALLOWED_REFERRER_ORIGIN empty in build-config.sh)"
+fi
+
 # Encrypted upload + result helper
 # Usage: run_tool_test <tool_label> <tool_name> <toe_base64> <parameters_json>
 run_tool_test() {
@@ -67,9 +99,10 @@ run_tool_test() {
   echo "--- /upload + /result ($LABEL) ---"
   local RESULT
   RESULT=$(BASE_URL="$BASE_URL" TOOL_NAME="$TOOL_NAME" TOE_B64="$TOE_B64" PARAMS_JSON="$PARAMS_JSON" \
+    REFERRER="$ALLOWED_REFERRER_ORIGIN" \
     NODE_TLS_REJECT_UNAUTHORIZED=0 node 2>/dev/null <<'NODESCRIPT'
 const crypto = require('node:crypto').webcrypto;
-const { BASE_URL, TOOL_NAME, TOE_B64, PARAMS_JSON } = process.env;
+const { BASE_URL, TOOL_NAME, TOE_B64, PARAMS_JSON, REFERRER } = process.env;
 
 function toBase64(u) { return Buffer.from(u).toString('base64'); }
 function fromBase64(b) { return new Uint8Array(Buffer.from(b, 'base64')); }
@@ -120,6 +153,9 @@ async function run() {
   };
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
   const encrypted = await encryptPayload(pubKey, plaintext);
+  // Forward the navigation referrer the browser client would send, so the
+  // upload passes the anti-freeloading gate (no-op when the gate is disabled).
+  encrypted.referrer = REFERRER || '';
 
   const uploadResp = await fetch(BASE_URL + '/upload', {
     method: 'POST',
