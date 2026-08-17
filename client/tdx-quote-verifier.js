@@ -7,7 +7,6 @@ import {
   verifySignature,
   validateCertificateChain,
   fromBase64,
-  toBase64,
   sha256,
   joinByteArrays,
   eqByteArr,
@@ -408,6 +407,9 @@ async function parseQuote(data) {
     header,
     body,
     signature,
+    // Exactly the bytes covered by the attestation key's signature:
+    // the 48-byte quote header followed by the 584-byte TD report body.
+    signedData: joinByteArrays([headerRaw, bodyRaw]),
   }
 }
 
@@ -520,10 +522,11 @@ export default async (
   //check report
   const headerResult = await checkHeader(quote.header);
   if (headerResult instanceof Error) { return headerResult; }
-  const bodyResult = await checkBody(quote.body, expectedRTMR2);
-  if (bodyResult instanceof Error) { return bodyResult; }
   const signatureResult = await checkSignature(quote.signature);
   if (signatureResult instanceof Error) { return signatureResult; }
+  // NOTE: checkBody runs at the very end, once the quote body has been
+  // authenticated. Never compare a measurement before verifying the
+  // signature over the blob that carries it.
 
 
   if (quote.signature.qeCertificationData.certDataType != CERT_DATA_TYPE_QE_REPORT_CERTIFICATION_DATA) {
@@ -565,70 +568,60 @@ export default async (
     return Error(`Failed to verify certificate chain.`);
   }
   
-  // Verify report body signature
-  const publicKey = await quote.signature.qeCertificationData.certData.innerQeCertData.certData[0].getPublicKey();
+  const qeCertData = quote.signature.qeCertificationData.certData;
+
+  // Verify the QE report signature against the PCK certificate.
+  // This establishes that Intel's Quoting Enclave produced this report.
+  const publicKey = await qeCertData.innerQeCertData.certData[0].getPublicKey();
   const verifiedReportBodySignature = await verifySignature(
     publicKey,
-    quote.signature.qeCertificationData.certData.qeReportSignature,
-    quote.signature.qeCertificationData.certData.qeReportDataRaw,
+    qeCertData.qeReportSignature,
+    qeCertData.qeReportDataRaw,
   );
   if (verifiedReportBodySignature instanceof Error) {
     return verifiedReportBodySignature;
   }
-  return quote
+
+  // Bind the attestation key to the PCK-signed QE report.
   //
-  // // Verify quote signature
-  // const attestationKey = quote.quoteAuthData.attestationKey.key
-  // if (attestationKey instanceof Error) {
-  //   return attestationKey;
-  // }
-  // const verifiedQuoteSignature = await verifySignature(
-  //   attestationKey,
-  //   quote.quoteAuthData.signature,
-  //   quote.signedData
-  // );
-  // if (verifiedQuoteSignature instanceof Error) {
-  //   return verifiedQuoteSignature;
-  // }
-  //
-  // // Verify hash
-  // const authDataHash = await sha256(
-  //   joinByteArrays([quote.quoteAuthData.attestationKey.raw, quote.qeAuthData])
-  // );
-  // if (!eqByteArr(authDataHash, quote.quoteAuthData.qeReportBody.reportData.slice(0, 32))) {
-  //   return Error(`Hash mismatch.`);
-  // }
-  //
-  // Verify unique ID
-  // if (
-  //   uniqueID &&
-  //   !eqByteArr(fromBase64(uniqueID), quote.reportBody.mrenclave)
-  // ) {
-  //   return Error(`Unique ID mismatch. (expected: ${uniqueID}, got: ${toBase64(quote.reportBody.mrenclave)})`);
-  // }
-  //
-  // // Verify signer ID
-  // if (
-  //   signerID &&
-  //   !eqByteArr(fromBase64(signerID), quote.reportBody.mrsigner)
-  // ) {
-  //   return Error(`Signer ID mismatch. (expected: ${signerID}, got: ${toBase64(quote.reportBody.mrsigner)})`);
-  // }
-  //
-  // // Verify product ID
-  // if (
-  //   productID &&
-  //   !eqByteArr(fromBase64(productID), quote.reportBody.productID)
-  // ) {
-  //   return Error(`Product ID mismatch. (expected: ${productID}, got: ${toBase64(quote.reportBody.productID)})`);
-  // }
-  //
-  // // Verify security version
-  // if (quote.quoteAuthData.qeReportBody.securityVersion < securityVersion) {
-  //   return Error(`Security version is out of date. (expected: ${securityVersion}, got: ${quote.quoteAuthData.qeReportBody.securityVersion})`);
-  // }
-  //
-  // return quote.reportBody;
+  // The step above proves the QE report is genuine, but on its own says nothing
+  // about the attestation key carried alongside it. The QE commits to that key by
+  // placing SHA256(attestationKey || qeAuthData) in the first 32 bytes of the
+  // report data, so checking that hash is what transfers trust from the PCK
+  // certificate to the attestation key. Without it the key below is unauthenticated.
+  const authDataHash = await sha256(
+    joinByteArrays([quote.signature.pubAttestKeyQE, qeCertData.qeAuthData])
+  );
+  if (!eqByteArr(authDataHash, qeCertData.qeReportData.reportData.slice(0, 32))) {
+    return Error(
+      `Attestation key is not bound to the QE report (report data hash mismatch).`
+    );
+  }
+
+  // Verify the quote signature using the now-trusted attestation key.
+  // This is what makes the TD report body — and therefore every RTMR value
+  // compared below — trustworthy rather than attacker-supplied.
+  const attestationKey = await importPublicECDSAKey(
+    joinByteArrays([new Uint8Array([0x04]), quote.signature.pubAttestKeyQE]),
+    "raw"
+  );
+  if (attestationKey instanceof Error) {
+    return attestationKey;
+  }
+  const verifiedQuoteSignature = await verifySignature(
+    attestationKey,
+    quote.signature.quoteSignature,
+    quote.signedData,
+  );
+  if (verifiedQuoteSignature instanceof Error) {
+    return verifiedQuoteSignature;
+  }
+
+  // Only now is it meaningful to compare measurements.
+  const bodyResult = await checkBody(quote.body, expectedRTMR2);
+  if (bodyResult instanceof Error) { return bodyResult; }
+
+  return quote;
 };
 
 const unpackLENumber = (bytes) => {

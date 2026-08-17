@@ -15,8 +15,10 @@ Browser-based client for verifying TDX quotes and uploading test jobs to a trust
 ## What It Does
 
 - Fetches TDX quote from service at https://150.140.195.209:8444/quote
-- Verifies quote signature and certificate chain against Intel root CA
+- Verifies the certificate chain against Intel root CA
 - Checks CRL for certificate revocation
+- Binds the attestation key to the PCK-signed QE report, then verifies the TD quote signature
+  with it — measurements are only compared once this succeeds
 - Validates RTMR2 from the quote (fetched from service in dev mode; should be hardcoded for production)
 - Extracts public key from reportData for future signing key verification
 - Uploads test jobs to https://150.140.195.209:8444/upload after successful verification
