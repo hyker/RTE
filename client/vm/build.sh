@@ -309,6 +309,9 @@ write_files:
           add_header X-Frame-Options SAMEORIGIN;
           add_header X-XSS-Protection "1; mode=block";
           add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+          # Revalidate every request: the bundle pins RTMR2, which changes on
+          # each image rebuild, and a stale cached bundle fails verification.
+          add_header Cache-Control "no-cache";
 
           location / {
               try_files $uri $uri/ =404;
