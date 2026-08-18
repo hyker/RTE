@@ -24,6 +24,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/quote", quoteHandler)
 	mux.HandleFunc("/rtmr2", rtmr2Handler)
+	mux.HandleFunc("/measurements", measurementsHandler)
 	mux.HandleFunc("/tools", toolsHandler)
 	mux.HandleFunc("/upload", uploadHandler)
 	mux.HandleFunc("/result", resultHandler)

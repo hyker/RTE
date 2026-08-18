@@ -231,15 +231,15 @@ function parseQuoteBody(data) {
     mrSignerSEAM,
     seamAttributes,
     tdAttributes: {
-      debug: tdAttributes & 0x1,
-      reservedTUD: (tdAttributes >> 1) & 0x7F,
-      reservedSEC: (tdAttributes >> 8) & 0xFFFFF,
-      septVeDisable: (tdAttributes >> 28) & 0x1,
-      reservedSEC2: (tdAttributes >> 29) & 0x1,
-      PKS: (tdAttributes >> 30) & 0x1,
-      KL: (tdAttributes >> 31) & 0x1,
-      otherReserved: Number((BigInt(tdAttributes)>> 32n) & 0x7FFFFFFFn),
-      otherPerfMon: Number((BigInt(tdAttributes)>> 63n) & 0x1n),
+      debug: (tdAttributes & 0x1n) === 0x1n,
+      reservedTUD: Number((tdAttributes >> 1n) & 0x7Fn),
+      reservedSEC: Number((tdAttributes >> 8n) & 0xFFFFFn),
+      septVeDisable: Number((tdAttributes >> 28n) & 0x1n),
+      reservedSEC2: Number((tdAttributes >> 29n) & 0x1n),
+      PKS: Number((tdAttributes >> 30n) & 0x1n),
+      KL: Number((tdAttributes >> 31n) & 0x1n),
+      otherReserved: Number((tdAttributes >> 32n) & 0x7FFFFFFFn),
+      otherPerfMon: Number((tdAttributes >> 63n) & 0x1n),
     },
     xfam,
     mrTd,
@@ -434,16 +434,65 @@ async function checkHeader(header) {
 }
 
 
-async function checkBody(body, expectedRTMR2) {
-  if (!expectedRTMR2) {
-    return new Error('Expected RTMR2 not set — build pipeline must record RTMR2 before building the client');
+const toHex = (bytes) =>
+  Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+// Returns null when the measurement matches, an Error describing the mismatch otherwise.
+function compareMeasurement(actual, expected, name) {
+  if (!expected) {
+    return new Error(`Expected ${name} not set — build pipeline must record it before building the client`);
   }
-  const rtmr2Hex = Array.from(body.RTMR2)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  if (rtmr2Hex !== expectedRTMR2.toLowerCase()) {
-    return new Error(`RTMR2 mismatch: expected ${expectedRTMR2}, got ${rtmr2Hex}`);
+  const actualHex = toHex(actual);
+  if (actualHex !== expected.toLowerCase()) {
+    return new Error(`${name} mismatch: expected ${expected}, got ${actualHex}`);
   }
+  return null;
+}
+
+// Pins the boot chain. Returns { warnings } on success, an Error on failure.
+//
+//   MRTD   TDVF firmware code
+//   RTMR1  shim + grubx64.efi + the GPT — i.e. which bootloader did the measuring
+//   RTMR2  cmdline / kernel / initrd — i.e. what that bootloader reported loading
+//
+// RTMR2 alone is not enough: the ESP and /boot sit outside dm-verity and Secure Boot
+// is off, so a host could swap grubx64.efi for one that extends RTMR2 with the
+// expected digests and then boot something else. RTMR1 is what closes that.
+async function checkBody(body, expectedMeasurements) {
+  const expected = expectedMeasurements || {};
+  const warnings = [];
+
+  for (const [name, actual] of [
+    ['MRTD', body.mrTd],
+    ['RTMR1', body.RTMR1],
+    ['RTMR2', body.RTMR2],
+  ]) {
+    const err = compareMeasurement(actual, expected[name], name);
+    if (err) {
+      return err;
+    }
+  }
+
+  // RTMR0 covers host firmware configuration, which legitimately changes with the
+  // host's QEMU/OVMF version and the VM's memory size. Surfaced, but not fatal —
+  // a hard failure here would take the service down for every client on any host
+  // package upgrade.
+  const rtmr0Err = compareMeasurement(body.RTMR0, expected.RTMR0, 'RTMR0');
+  if (rtmr0Err) {
+    warnings.push(rtmr0Err.message);
+  }
+
+  // Invariants: no expected value needed, so these are not recorded at build time.
+  if (!body.RTMR3.every(b => b === 0)) {
+    return new Error(
+      `RTMR3 is not zero (got ${toHex(body.RTMR3)}) — something extended it at runtime`
+    );
+  }
+  if (body.tdAttributes.debug) {
+    return new Error('TD debug bit is set — the host can inspect guest memory');
+  }
+
+  return { warnings };
 }
 
 async function checkSignature(signature) {
@@ -508,11 +557,7 @@ async function checkSignature(signature) {
 export default async (
   report,
   {
-    securityVersion = 0,
-    uniqueID,
-    signerID,
-    productID,
-    expectedRTMR2 = null
+    expectedMeasurements = null
   }
 ) => {
   // Parse report
@@ -618,8 +663,11 @@ export default async (
   }
 
   // Only now is it meaningful to compare measurements.
-  const bodyResult = await checkBody(quote.body, expectedRTMR2);
+  const bodyResult = await checkBody(quote.body, expectedMeasurements);
   if (bodyResult instanceof Error) { return bodyResult; }
+
+  // Non-fatal findings (currently RTMR0 drift) for the caller to surface.
+  quote.warnings = bodyResult.warnings;
 
   return quote;
 };
@@ -666,12 +714,15 @@ class Seeker {
     return unpackLENumber(data);
   }
 
+  // Returns a BigInt. `unpackLENumber` uses 32-bit bitwise operators, so it
+  // silently corrupts any 64-bit field with bits above 2^31 set — which is the
+  // normal case for XFAM and TD attributes.
   extractLEU64() {
     const data = this.extract(8);
     if (data instanceof Error) {
       return data;
     }
-    return unpackLENumber(data);
+    return data.reduceRight((acc, byte) => (acc << 8n) + BigInt(byte), 0n);
   }
 
   skip(length) {

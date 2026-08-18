@@ -154,9 +154,15 @@ cd client/vm && ./build.sh --prod|--dev
 ./boot.sh --dev   # HTTPS 9444, SSH 2223
 ```
 
-**RTMR2 and the client bundle:** Step 3 records the expected RTMR2 value into `verity-image.img.meta`. Step 4 reads it and bakes it as a constant into `bundle.js` — the client verifier compares the quote's RTMR2 against this hardcoded value rather than trusting the enclave to report its own. If RTMR2 is not yet set in `.meta` (e.g. non-TDX builds), the check is disabled and a warning is printed during the client build.
+**Measurements and the client bundle:** Step 3 records `MRTD`, `RTMR0`, `RTMR1` and `RTMR2` into `verity-image.img.meta` (via `/measurements`; the older RTMR2-only `/rtmr2` endpoint still works). Step 4 reads them and bakes them into `bundle.js` — the client compares the quote against these hardcoded values rather than trusting the enclave to report its own. The build fails if any is missing or malformed.
 
-`boot.sh` reads `verity-image.img.meta` for VM configuration (TDX mode, RAM size). Image integrity is ensured at runtime by dm-verity (root filesystem) and RTMR2 (full boot chain). The Cloudflare API token is passed to the VM via QEMU `fw_cfg` — never written to the image.
+MRTD, RTMR1 and RTMR2 are hard failures. RTMR0 is advisory: it covers host firmware configuration and legitimately changes with the host's QEMU/OVMF version and the VM's RAM size, so a mismatch is shown as a warning rather than taking the service down for every client. RTMR3 (must be zero) and the TD debug bit (must be clear) are invariants and so are not recorded.
+
+Because MRTD and RTMR1 are now pinned, **upgrading the host's OVMF package or changing the ESP contents requires re-recording and a client rebuild**, exactly as a rootfs change does today.
+
+`record-rtmr2.sh` boots with `boot.sh --measure-only`, which passes a sentinel in place of the Cloudflare token so the guest serves a self-signed certificate and never contacts Let's Encrypt. Measurement boots therefore cost no certificate (LE allows only 5 duplicates per week).
+
+`boot.sh` reads `verity-image.img.meta` for VM configuration (TDX mode, RAM size). Image integrity is ensured at runtime by dm-verity (root filesystem) and by the pinned measurements above (MRTD, RTMR1 and RTMR2 covering firmware, bootloader and kernel/initrd/cmdline). The Cloudflare API token is passed to the VM via QEMU `fw_cfg` — never written to the image.
 
 ## Security model
 

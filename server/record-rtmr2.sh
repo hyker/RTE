@@ -1,7 +1,14 @@
 #!/bin/bash
-# Boot the VM, query /rtmr2, write the value into the image .meta file, then stop the VM.
+# Boot the VM, query /measurements, write the values into the image .meta file, then stop the VM.
 # Run this after setup-verity.sh and before building the client bundle.
 # The top-level build.sh runs this automatically; use standalone only if needed.
+#
+# Records MRTD, RTMR0, RTMR1 and RTMR2 (the script name is kept for compatibility
+# with build.sh and the README). RTMR3 and the TD debug bit are deliberately not
+# recorded — the client checks those as invariants, with no expected value.
+#
+# The boot uses `boot.sh --measure-only`, so no Let's Encrypt certificate is spent.
+# Values are sanity-checked by client/vm/build.sh before they are baked into the bundle.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -26,18 +33,29 @@ if [ ! -f "$META" ]; then
   exit 1
 fi
 
-EXISTING=$(grep "^RTMR2=" "$META" | cut -d= -f2)
-if [ -n "$EXISTING" ]; then
-  echo "RTMR2 already set in $META: $EXISTING"
-  echo "To re-record, clear the RTMR2= line in $META first."
+# .meta keys paired with their /measurements JSON key.
+META_KEYS=(MRTD RTMR0 RTMR1 RTMR2)
+JSON_KEYS=(mrTd rtmr0 rtmr1 rtmr2)
+
+meta_get() { grep "^$1=" "$META" | cut -d= -f2; }
+json_field() { echo "$1" | grep -o "\"$2\":\"[^\"]*\"" | cut -d'"' -f4; }
+
+# Skip only if every value is already recorded.
+ALL_SET=true
+for key in "${META_KEYS[@]}"; do
+  [ -z "$(meta_get "$key")" ] && ALL_SET=false
+done
+if [ "$ALL_SET" = true ]; then
+  echo "All measurements already set in $META. To re-record, clear those lines first."
+  for key in "${META_KEYS[@]}"; do echo "  $key=$(meta_get "$key")"; done
   exit 0
 fi
 
-echo "Booting VM ($MODE) to record RTMR2..."
+echo "Booting VM ($MODE, measure-only) to record measurements..."
 # Kill any stale VM from a previous run to free the port
 pkill -f "process=$VM_NAME" 2>/dev/null || true
 sleep 1
-./boot.sh --$MODE
+./boot.sh --"$MODE" --measure-only
 
 cleanup() {
   echo "Stopping VM..."
@@ -48,26 +66,25 @@ trap cleanup EXIT
 echo "Waiting for custodes on port $PORT (up to 5 min)..."
 TIMEOUT=300
 ELAPSED=0
-RTMR2_HEX=""
+RESPONSE=""
 while [ $ELAPSED -lt $TIMEOUT ]; do
-  RESPONSE=$(curl -sk --max-time 5 "https://localhost:$PORT/rtmr2" 2>/dev/null || true)
-  if [ -n "$RESPONSE" ]; then
-    RTMR2_HEX=$(echo "$RESPONSE" | grep -o '"rtmr2":"[^"]*"' | cut -d'"' -f4)
-    if [[ "$RTMR2_HEX" =~ ^[0-9a-fA-F]{96}$ ]]; then
-      break
-    fi
-  fi
+  RESPONSE=$(curl -sk --max-time 5 "https://localhost:$PORT/measurements" 2>/dev/null || true)
+  [ -n "$(json_field "$RESPONSE" rtmr2)" ] && break
+  RESPONSE=""
   sleep 5
   ELAPSED=$((ELAPSED + 5))
   printf "  ...%ds\n" "$ELAPSED"
 done
 
-if [[ ! "$RTMR2_HEX" =~ ^[0-9a-fA-F]{96}$ ]]; then
-  echo "Error: failed to get a valid RTMR2 within ${TIMEOUT}s"
+if [ -z "$RESPONSE" ]; then
+  echo "Error: no valid response from /measurements within ${TIMEOUT}s"
   exit 1
 fi
 
-sed -i "s/^RTMR2=.*/RTMR2=$RTMR2_HEX/" "$META"
+for i in "${!META_KEYS[@]}"; do
+  VALUE=$(json_field "$RESPONSE" "${JSON_KEYS[$i]}")
+  sed -i "s/^${META_KEYS[$i]}=.*/${META_KEYS[$i]}=$VALUE/" "$META"
+  echo "  ${META_KEYS[$i]}=$VALUE"
+done
 
-echo "RTMR2 recorded: $RTMR2_HEX"
-echo "Written to $META"
+echo "Measurements written to $META"

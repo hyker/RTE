@@ -6,13 +6,21 @@ const SERVICE_BASE_URL = '__SERVICE_URL__';
 const QUOTE_SERVICE_URL = `${SERVICE_BASE_URL}/quote`;
 const UPLOAD_SERVICE_URL = `${SERVICE_BASE_URL}/upload`;
 
-// Expected RTMR2 — injected at build time from server .meta file
-const EXPECTED_RTMR2 = "__RTMR2_SENTINEL__";
+// Expected measurements — injected at build time from the server .meta file.
+// RTMR3 and the TD debug bit are checked as invariants inside the verifier and
+// so need no expected value here.
+const EXPECTED_MEASUREMENTS = {
+  MRTD:  "__MRTD_SENTINEL__",
+  RTMR0: "__RTMR0_SENTINEL__",
+  RTMR1: "__RTMR1_SENTINEL__",
+  RTMR2: "__RTMR2_SENTINEL__",
+};
 
-// Display expected RTMR2 in the UI
+// Display expected RTMR2 in the UI as the server ID. The other pinned values are
+// enforced by the verifier but not surfaced here.
 const rtmr2El = document.getElementById('expectedRtmr2');
 if (rtmr2El) {
-  rtmr2El.textContent = EXPECTED_RTMR2;
+  rtmr2El.textContent = EXPECTED_MEASUREMENTS.RTMR2;
 }
 
 // Global storage for uploaded CRLs — pre-load from VM-fetched CRLs if available
@@ -85,13 +93,18 @@ async function loadCRL() {
 }
 
 // Show result box with pass/fail status
-function showResult(outputEl, status, message) {
+// `warnings` are non-fatal findings: verification passed, but something is worth
+// the user's attention. Shown as a yellow PASS rather than a separate notice.
+function showResult(outputEl, status, message, warnings = []) {
+  const small = 'font-weight:normal;font-size:14px;margin-top:8px;display:block;word-break:break-all;';
   if (status === 'loading') {
     outputEl.innerHTML = `<div class="result-box loading">${message}</div>`;
   } else if (status === 'pass') {
-    outputEl.innerHTML = `<div class="result-box pass">PASS</div>`;
+    outputEl.innerHTML = warnings.length
+      ? `<div class="result-box warn">PASS (with warnings)<br><small style="${small}">${warnings.join(' ')}</small></div>`
+      : `<div class="result-box pass">PASS</div>`;
   } else {
-    outputEl.innerHTML = `<div class="result-box fail">FAIL<br><small style="font-weight:normal;font-size:14px;margin-top:8px;display:block;">${message}</small></div>`;
+    outputEl.innerHTML = `<div class="result-box fail">FAIL<br><small style="${small}">${message}</small></div>`;
   }
 }
 
@@ -135,9 +148,9 @@ export async function fetchAndVerifyQuote() {
       throw new Error('Failed to decode quote data');
     }
 
-    // Verify quote — RTMR2 check is performed inside the verifier
+    // Verify quote — measurement checks are performed inside the verifier
     const result = await verifyTdxQuote(quoteBytes, {
-      expectedRTMR2: EXPECTED_RTMR2
+      expectedMeasurements: EXPECTED_MEASUREMENTS
     });
 
     if (result instanceof Error) {
@@ -150,9 +163,10 @@ export async function fetchAndVerifyQuote() {
       window.extractedPublicKey = publicKeyResult.publicKey;
     }
 
-    // All checks passed
+    // All checks passed. RTMR0 drift, if any, is reported as a warning rather than
+    // a failure — it tracks the host's QEMU/OVMF version, not the service itself.
     window.verificationState = 'passed';
-    showResult(outputEl, 'pass', '');
+    showResult(outputEl, 'pass', '', result.warnings);
 
     // Advance to step 4
     if (window.advanceToStep) {

@@ -1,6 +1,7 @@
 #!/bin/bash
 #
 MODE=""
+MEASURE_ONLY=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -12,11 +13,18 @@ while [[ $# -gt 0 ]]; do
       MODE="dev"
       shift
       ;;
+    --measure-only)
+      MEASURE_ONLY=true
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 --prod|--dev"
+      echo "Usage: $0 --prod|--dev [--measure-only]"
       echo "  --prod: Port 8444, SSH 2222 (production image)"
       echo "  --dev:  Port 9444, SSH 2223 (dev overlay image)"
+      echo "  --measure-only: skip Let's Encrypt, serve a self-signed cert."
+      echo "                  For reading measurements without spending a"
+      echo "                  certificate (LE allows 5 duplicates per week)."
       exit 1
       ;;
   esac
@@ -51,16 +59,29 @@ fi
 source "${BASE_IMAGE}.meta"
 
 # Load CF API token and pass to VM via fw_cfg (never touches the image)
-if [ ! -f secrets.sh ]; then
-  echo "Error: secrets.sh not found. Create it with CF_API_TOKEN=<token>."
-  exit 1
-fi
-source secrets.sh
-
 CF_INI_FILE=$(mktemp)
 chmod 600 "$CF_INI_FILE"
-printf 'dns_cloudflare_api_token = %s\n' "$CF_API_TOKEN" > "$CF_INI_FILE"
 trap "rm -f $CF_INI_FILE" EXIT
+
+if [ "$MEASURE_ONLY" = true ]; then
+  # Hand the guest a sentinel instead of a real token. tls-provision.sh sees it
+  # and goes straight to a self-signed cert without invoking certbot at all, so
+  # Let's Encrypt is never contacted — no certificate spent, no ACME account
+  # registered, no failed validation recorded.
+  #
+  # The fw_cfg entry is still present, so the QEMU device layout is byte-identical
+  # to a production boot and the measurements read here are the ones a production
+  # boot would produce. Only the entry's contents differ.
+  printf 'dns_cloudflare_api_token = %s\n' "MEASURE_ONLY" > "$CF_INI_FILE"
+  echo "Measure-only boot: Let's Encrypt will not be contacted (self-signed cert)."
+else
+  if [ ! -f secrets.sh ]; then
+    echo "Error: secrets.sh not found. Create it with CF_API_TOKEN=<token>."
+    exit 1
+  fi
+  source secrets.sh
+  printf 'dns_cloudflare_api_token = %s\n' "$CF_API_TOKEN" > "$CF_INI_FILE"
+fi
 
 FW_CFG_ARGS=(
   -fw_cfg "name=opt/certbot/cloudflare-ini,file=${CF_INI_FILE}"

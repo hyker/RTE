@@ -19,7 +19,9 @@ Browser-based client for verifying TDX quotes and uploading test jobs to a trust
 - Checks CRL for certificate revocation
 - Binds the attestation key to the PCK-signed QE report, then verifies the TD quote signature
   with it — measurements are only compared once this succeeds
-- Validates RTMR2 from the quote (fetched from service in dev mode; should be hardcoded for production)
+- Pins the boot chain against values baked in at build time: MRTD (firmware), RTMR1 (bootloader
+  + GPT) and RTMR2 (kernel/initrd/cmdline) are hard failures; RTMR0 (host config) is a warning
+  only. RTMR3 must be zero and the TD debug bit must be clear
 - Extracts public key from reportData for future signing key verification
 - Uploads test jobs to https://150.140.195.209:8444/upload after successful verification
 

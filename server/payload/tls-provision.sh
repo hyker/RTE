@@ -42,6 +42,21 @@ mkdir -p /run/certbot && chmod 700 /run/certbot
 cat "$FW_CFG_INI" > /run/certbot/cloudflare.ini
 chmod 600 /run/certbot/cloudflare.ini
 
+# Measurement boot (boot.sh --measure-only): the host passes this sentinel in place
+# of a real token so we can read RTMRs without spending a Let's Encrypt certificate
+# (5 duplicates per week). Bail out before certbot runs, so LE is never contacted —
+# no ACME account registered and no failed validation recorded against the domain.
+#
+# This grants the host no capability it lacks otherwise: it can already force this
+# path by withholding the fw_cfg entry or blocking network access to LE. The TLS
+# certificate is not a root of trust here — attestation is.
+if grep -q '^dns_cloudflare_api_token = MEASURE_ONLY$' /run/certbot/cloudflare.ini; then
+    log "measure-only sentinel present — skipping certbot, self-signed cert"
+    make_self_signed
+    log "=== tls-provision done (self-signed — measure-only) ==="
+    exit 0
+fi
+
 mkdir -p /var/log/letsencrypt
 
 CERTBOT_ARGS=(

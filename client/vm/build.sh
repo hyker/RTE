@@ -65,17 +65,28 @@ echo "Building JS bundle..."
 sed -i "s|__SERVICE_URL__|$SERVICE_URL|" "$PROJECT_DIR/bundle.js"
 echo "Service URL injected: $SERVICE_URL"
 
-# Inject expected RTMR2 from server image metadata into the bundle.
-# Build fails if RTMR2 is not recorded — the client requires it.
-RTMR2_VALUE=""
-if [ -f "$SERVER_META" ]; then
-  RTMR2_VALUE=$(grep "^RTMR2=" "$SERVER_META" | cut -d= -f2)
+# Inject the expected measurements from server image metadata into the bundle.
+# Build fails if any is missing or malformed — this is the gate before a value is
+# baked into the client, so record-rtmr2.sh does not validate separately.
+if [ ! -f "$SERVER_META" ]; then
+  echo "ERROR: $SERVER_META not found — run record-rtmr2.sh first"
+  exit 1
 fi
-if [[ "$RTMR2_VALUE" =~ ^[0-9a-fA-F]{96}$ ]]; then
-  sed -i "s/\"__RTMR2_SENTINEL__\"/\"$RTMR2_VALUE\"/" "$PROJECT_DIR/bundle.js"
-  echo "RTMR2 injected: $RTMR2_VALUE"
-else
-  echo "ERROR: RTMR2 not set in $SERVER_META — run record-rtmr2.sh first"
+
+for KEY in MRTD RTMR0 RTMR1 RTMR2; do
+  VALUE=$(grep "^$KEY=" "$SERVER_META" | cut -d= -f2)
+  if [[ ! "$VALUE" =~ ^[0-9a-fA-F]{96}$ ]]; then
+    echo "ERROR: $KEY not set in $SERVER_META — run record-rtmr2.sh first"
+    exit 1
+  fi
+  sed -i "s/\"__${KEY}_SENTINEL__\"/\"$VALUE\"/" "$PROJECT_DIR/bundle.js"
+  echo "$KEY injected: $VALUE"
+done
+
+# Every sentinel must have been replaced; an unsubstituted one would ship a client
+# that compares against the literal placeholder.
+if grep -q '__MRTD_SENTINEL__\|__RTMR0_SENTINEL__\|__RTMR1_SENTINEL__\|__RTMR2_SENTINEL__' "$PROJECT_DIR/bundle.js"; then
+  echo "ERROR: unsubstituted measurement sentinel remains in bundle.js"
   exit 1
 fi
 

@@ -101,11 +101,17 @@ if [ ! -f build.meta ]; then
 fi
 source build.meta
 
-# Write final metadata
+# Write final metadata. The measurement values are filled in by record-rtmr2.sh,
+# which boots the image and reads them back from /measurements.
+# RTMR3 and the TD debug bit are not recorded: their policy is an invariant
+# (must be zero / must be clear), so the client checks them without an expected value.
 cat > "${OUTPUT_IMAGE}.meta" <<EOF
 TDX=$TDX
 DEBUG=$DEBUG
 VM_MEMORY=$VM_MEMORY
+MRTD=
+RTMR0=
+RTMR1=
 RTMR2=
 EOF
 
