@@ -215,9 +215,26 @@ if [ "$DEBUG_MODE" = false ]; then
     --run-command "systemctl mask getty@.service serial-getty@.service"
 fi
 
+# Canonical's TDX setup pins a specific kernel: setup-tdx-common:80-90 writes
+# /etc/default/grub.d/99-tdx-kernel.cfg with GRUB_DEFAULT=saved and points grubenv's
+# saved_entry at whatever generic kernel was newest when the TDX base qcow2 was built.
+# That base is cached for months, so the pin outlives it and the build-time dist-upgrade
+# goes inert for the kernel: the new one installs and becomes the top menu entry, while
+# GRUB goes on booting the old saved one.
+#
+# Its intent -- boot the newest generic kernel -- is ours too, so take entry 0 instead,
+# which stays correct after an upgrade. The file has to sort AFTER 99-tdx-kernel.cfg
+# (grub.d is sourced in lexical order, last assignment wins), hence 99-zz-.
+# Determinism matters here beyond the upgrade: under GRUB_DEFAULT=saved, which kernel
+# boots is a function of leftover grubenv state rather than of the image -- and the
+# kernel is measured into RTMR2.
 sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a base-working.raw \
+  --run-command "mkdir -p /etc/default/grub.d" \
+  --run-command "printf 'GRUB_DEFAULT=0\nGRUB_SAVEDEFAULT=false\n' > /etc/default/grub.d/99-zz-rte-boot.cfg" \
   --run-command "update-grub" \
-  --run-command "update-initramfs -u -k all"
+  --run-command "update-initramfs -u -k all" \
+  --run-command "grub-editenv /boot/grub/grubenv unset saved_entry" \
+  --run-command "if ! grep -q 'set default=\"0\"' /boot/grub/grub.cfg; then echo 'ERROR: grub default is not entry 0'; exit 1; fi"
 
 # Save as cached base image
 mv base-working.raw base-image.raw
