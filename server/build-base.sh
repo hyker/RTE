@@ -125,6 +125,27 @@ else
   qemu-img convert -f qcow2 -O raw ubuntu-24.04-server-cloudimg-amd64.img base-working.raw
 fi
 
+# Bring the base fully up to date before anything is layered on top of it.
+# The downloaded Ubuntu cloud image -- and the TDX qcow2 built from it -- is a
+# snapshot that drifts further behind with every week since its release, and it is
+# cached locally across builds, so without this a fresh build can still ship
+# months-old packages. Doing it first also means the --install passes below and
+# add-payload.sh resolve against current package lists.
+#
+# This is also the only path for kernel and microcode fixes: those take effect at
+# boot, and a reboot returns the VM to this image, so applying them at runtime
+# would achieve nothing.
+#
+# dist-upgrade rather than upgrade: a kernel ABI bump arrives as a new package name
+# (linux-image-6.8.0-NNN-generic), which plain upgrade will not pull in.
+#
+# Whenever this actually upgrades something the rootfs changes, and with it the
+# verity root hash and RTMR2 -- so re-record measurements and rebuild the client.
+sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a base-working.raw \
+  --run-command "apt-get update" \
+  --run-command "DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade --yes" \
+  --run-command "apt-get clean"
+
 # expand image to accomodate a verity hash tree on a separate partition
 qemu-img resize -f raw base-working.raw +128M # 128M for verity hash (larger images need more)
 sgdisk -e base-working.raw
