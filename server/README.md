@@ -216,8 +216,21 @@ rm -rf /tmp/base-image-mount
 
 ## Writable Directories
 
-Root filesystem is read-only (dm-verity). Writable paths use tmpfs (defaults: ~12.5GB total):
-- `/tmp` (10G - payload storage), `/var/log` (256M), `/var/lib` (128M), `/var/cache` (64M), `/var/tmp` (2G - dependency-check database)
+The root filesystem sits on dm-verity, but it is no longer read-only at runtime: `overlayroot`
+puts a tmpfs overlay on top of it at boot, so apt and dpkg can write and the VM can apply
+Canonical security updates while it runs. The verity device underneath is never remounted
+read-write, so integrity checking of the lower layer is unaffected, and the upper layer is RAM
+that a reboot discards — a reboot returns the VM to the pristine attested image. What this does
+cost is guest-side immutability: root inside the guest can now write to `/usr` for the life of
+the boot. `/var/lib` and `/var/cache` used to be bare tmpfs, which hid `/var/lib/dpkg` and left
+apt inert; they now come from the overlay.
+
+Kernel and microcode are deliberately excluded from the runtime updates (see
+`/etc/apt/apt.conf.d/99zz-rte-unattended-upgrades`) — they only take effect on reboot, and a
+reboot returns to this image, so they are handled by the build-time `dist-upgrade` instead.
+
+Writable paths still on their own tmpfs (defaults: ~12.3GB total):
+- `/tmp` (10G - payload storage), `/var/log` (256M), `/var/tmp` (2G - dependency-check database)
 - Journal stored in `/run` (volatile, 64M max)
 - All tmpfs mounts use `noswap`, ensuring runtime data (TOE files, logs, TLS keys) is never written to disk even under memory pressure.
 
@@ -226,10 +239,10 @@ Sizes can be customized via environment variables when building:
 ```bash
 TMPFS_SIZE_TMP=20G ./build-base.sh
 ```
-Available variables: `TMPFS_SIZE_TMP`, `TMPFS_SIZE_VAR_LOG`, `TMPFS_SIZE_VAR_LIB`, `TMPFS_SIZE_VAR_CACHE`, `TMPFS_SIZE_VAR_TMP`, `TMPFS_SIZE_JOURNAL`
+Available variables: `TMPFS_SIZE_TMP`, `TMPFS_SIZE_VAR_LOG`, `TMPFS_SIZE_VAR_TMP`, `TMPFS_SIZE_JOURNAL`, `TMPFS_SIZE_OVERLAY`. Note `TMPFS_SIZE_OVERLAY` only sizes the VM's RAM — overlayroot drops any `size=`, so the overlay itself can grow to the kernel default of half of RAM.
 
 **VM RAM Requirements:**
-Required RAM = total tmpfs + 2GB overhead. Default: ~14.5GB (12.5GB tmpfs + 2GB). Custom tmpfs sizes automatically adjust RAM requirement (shown in build output).
+Required RAM = total tmpfs + 2GB overhead. Default: ~16.3GB (12.3GB of tmpfs mounts, plus the 2GB overlay budget, plus 2GB) — i.e. `VM_MEMORY=16704`. Custom tmpfs sizes automatically adjust RAM requirement (shown in build output).
 
 ## Disabled Services
 
