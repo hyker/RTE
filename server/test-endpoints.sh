@@ -67,6 +67,63 @@ else
   fail "no rtmr2 in response"
 fi
 
+# Test /measurements. Added with the Step 2 boot-chain pinning: the client pins MRTD
+# and RTMR1 as hard failures, so this endpoint agreeing with the image's .meta is what
+# makes a client bundle and a running image a matched pair. RTMR0 is deliberately not
+# compared -- it is warn-only in the verifier because it churns with the QEMU/OVMF
+# version, and it legitimately differs on a boot that adds a serial device.
+echo "--- /measurements ---"
+case $1 in
+  dev)  META="$SCRIPT_DIR/verity-dev-image.img.meta" ;;
+  prod) META="$SCRIPT_DIR/verity-image.img.meta" ;;
+esac
+MEAS=$(curl -sk "$BASE_URL/measurements")
+json_field() { echo "$1" | grep -o "\"$2\":\"[^\"]*\"" | cut -d'"' -f4; }
+meta_field() { grep "^$1=" "$META" | cut -d= -f2; }
+
+if echo "$MEAS" | grep -q '"mrTd"'; then
+  pass "returns all measurements"
+else
+  fail "no mrTd in response"
+fi
+
+if [ "$(json_field "$MEAS" rtmr2)" = "$(echo "$RTMR2" | grep -o '"rtmr2":"[^"]*"' | cut -d'"' -f4)" ]; then
+  pass "rtmr2 agrees with /rtmr2"
+else
+  fail "rtmr2 disagrees between /measurements and /rtmr2"
+fi
+
+if [ -f "$META" ]; then
+  MATCHED=true
+  check_meta() {
+    if [ "$(meta_field "$1")" != "$(json_field "$MEAS" "$2")" ]; then
+      fail "$1 does not match $META"
+      MATCHED=false
+    fi
+  }
+  check_meta MRTD  mrTd
+  check_meta RTMR1 rtmr1
+  check_meta RTMR2 rtmr2
+  [ "$MATCHED" = true ] && pass "MRTD/RTMR1/RTMR2 match the recorded .meta"
+else
+  echo "  SKIP: $META not found"
+fi
+
+# RTMR3 must stay all zeros and the TD debug bit must be clear -- both are hard
+# failures in the verifier, so catch a violation here rather than in a browser.
+if [ "$(json_field "$MEAS" rtmr3)" = "$(printf '0%.0s' $(seq 96))" ]; then
+  pass "rtmr3 is all zeros"
+else
+  fail "rtmr3 is not all zeros"
+fi
+
+TDATTR=$(json_field "$MEAS" tdAttributes)
+if [ $(( 0x${TDATTR:0:2} & 1 )) -eq 0 ]; then
+  pass "TD debug bit clear ($TDATTR)"
+else
+  fail "TD debug bit is SET ($TDATTR) - guest memory is host-inspectable"
+fi
+
 # Test /upload access control (anti-freeloading referrer gate).
 # The gate runs before decryption, so a forged/missing referrer is rejected with
 # HTTP 402 using only a well-formed (version 1) envelope — no valid ciphertext
