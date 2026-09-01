@@ -134,6 +134,15 @@ if [ "$USE_TDX" = true ]; then
     fi
   fi
 
+  # Firmware: OVMF.tdx.fd, NOT OVMF.fd. Only the .tdx variant carries the
+  # Microsoft/Canonical certificates, so it boots with Secure Boot enabled.
+  # That matters for more than signature checking: with Secure Boot off, GRUB
+  # loads the kernel via the classic Linux boot protocol and never calls
+  # firmware LoadImage, so no image-load event is produced and the kernel is
+  # measured into no register at all. A host could then replace /boot/vmlinuz
+  # -- which sits outside dm-verity -- and every pinned measurement would still
+  # match. With Secure Boot on, GRUB chain-loads the kernel through LoadImage,
+  # so it is both verified and measured into RTMR1, which the client hard-fails.
   qemu-system-x86_64 \
     -accel kvm \
     -cpu "$CPU_ARGS" \
@@ -143,7 +152,7 @@ if [ "$USE_TDX" = true ]; then
     -object '{"qom-type":"tdx-guest","id":"tdx","quote-generation-socket":{"type": "vsock", "cid":"'$GUEST_CID'","port":"4050"}}' \
     -object "memory-backend-ram,id=mem0,size=${VM_MEMORY}M" \
     -machine q35,kernel_irqchip=split,confidential-guest-support=tdx,memory-backend=mem0 \
-    -bios /usr/share/ovmf/OVMF.fd \
+    -bios /usr/share/ovmf/OVMF.tdx.fd \
     -nographic \
     -nodefaults \
     -vga none \
