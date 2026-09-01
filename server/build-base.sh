@@ -1,44 +1,59 @@
 #!/bin/bash
 set -e
 
+# Parse command line arguments
+USE_TDX=false
+DEBUG_MODE=false
+MODE=""
+usage() {
+  echo "Usage: $0 <--prod|--dev> [--tdx] [--debug]"
+  echo "  --prod:  use production Let's Encrypt certificates"
+  echo "  --dev:   use Let's Encrypt staging certificates"
+  echo "  --tdx:   build with TDX support (required for measurement recording)"
+  echo "  --debug: keep SSH, console login and the tdx account (never for production)"
+  echo ""
+  echo "Mode may be given as '--dev'/'--prod' or 'dev'/'prod'. There is no default."
+}
+while [[ $# -gt 0 ]]; do
+  case ${1#--} in
+    tdx)
+      USE_TDX=true
+      shift
+      ;;
+    debug)
+      DEBUG_MODE=true
+      shift
+      ;;
+    prod)
+      MODE="prod"
+      shift
+      ;;
+    dev)
+      MODE="dev"
+      shift
+      ;;
+    help|h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$MODE" ]; then
+  usage >&2
+  exit 1
+fi
+
 # Request sudo password upfront and keep session alive
 sudo -v
 # Keep sudo session alive in background
 while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done 2>/dev/null &
 
-# Parse command line arguments
-USE_TDX=false
-DEBUG_MODE=false
-MODE="dev"
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --tdx)
-      USE_TDX=true
-      shift
-      ;;
-    --debug)
-      DEBUG_MODE=true
-      shift
-      ;;
-    --prod)
-      MODE="prod"
-      shift
-      ;;
-    --dev)
-      MODE="dev"
-      shift
-      ;;
-    *)
-      echo "Unknown option: $1"
-      echo "Usage: $0 [--prod|--dev] [--tdx] [--debug]"
-      echo "  --prod:  use production LE certs (default is staging)"
-      echo "  --dev:   use LE staging certs (default)"
-      echo "  --tdx:   build with TDX support"
-      echo "  --debug: enable debug mode (keeps SSH and extra services enabled)"
-      exit 1
-      ;;
-  esac
-done
 
 # Load certbot configuration (domain, email — baked into image, no secrets)
 if [ ! -f build-config.sh ]; then
@@ -120,9 +135,50 @@ if [ "$USE_TDX" = true ]; then
   qemu-img convert -f qcow2 -O raw tdx-guest-ubuntu-24.04-generic.qcow2 base-working.raw
 else
 
-  # download plain ubuntu image as base (qcow2 format)
-  if [ ! -f ubuntu-24.04-server-cloudimg-amd64.img ]; then
-    wget https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
+  # Download the plain Ubuntu image and verify it before it becomes part of the
+  # attested rootfs. Canonical re-rolls the 24.04 image in place, so its published
+  # digest changes over time while OUR base image must not: replacing it would change
+  # the verity root hash and every recorded measurement. So the digest is checked
+  # against Canonical on first download and then pinned locally; later builds verify
+  # against the pin, which catches local corruption or tampering without coupling the
+  # build to upstream re-rolls.
+  CLOUDIMG=ubuntu-24.04-server-cloudimg-amd64.img
+  CLOUDIMG_BASE=https://cloud-images.ubuntu.com/releases/24.04/release
+  CLOUDIMG_PIN=ubuntu-cloudimg.sha256
+
+  if [ ! -f "$CLOUDIMG" ]; then
+    wget "$CLOUDIMG_BASE/$CLOUDIMG"
+    echo "Verifying freshly downloaded $CLOUDIMG against Canonical's SHA256SUMS..."
+    EXPECTED_SHA=$(curl -sSL "$CLOUDIMG_BASE/SHA256SUMS" \
+                   | grep " [ *]\?$CLOUDIMG\$" | awk '{print $1}')
+    if [ -z "$EXPECTED_SHA" ]; then
+      echo "Error: could not obtain a published checksum for $CLOUDIMG." >&2
+      exit 1
+    fi
+    ACTUAL_SHA=$(sha256sum "$CLOUDIMG" | awk '{print $1}')
+    if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+      echo "Error: downloaded $CLOUDIMG does not match Canonical's published digest." >&2
+      echo "  expected: $EXPECTED_SHA" >&2
+      echo "  actual:   $ACTUAL_SHA" >&2
+      rm -f "$CLOUDIMG"
+      exit 1
+    fi
+    echo "$ACTUAL_SHA  $CLOUDIMG" > "$CLOUDIMG_PIN"
+    echo "  OK, pinned in $CLOUDIMG_PIN"
+  elif [ -f "$CLOUDIMG_PIN" ]; then
+    echo "Verifying $CLOUDIMG against local pin ($CLOUDIMG_PIN)..."
+    if ! sha256sum -c "$CLOUDIMG_PIN" >/dev/null 2>&1; then
+      echo "Error: $CLOUDIMG does not match the pinned digest in $CLOUDIMG_PIN." >&2
+      echo "  The base image has changed on disk. Investigate before building --" >&2
+      echo "  rebuilding with a different base changes every recorded measurement." >&2
+      exit 1
+    fi
+    echo "  OK"
+  else
+    echo "Warning: $CLOUDIMG exists but is unpinned (predates checksum verification)."
+    echo "  Recording its current digest as the pin; delete both files and re-run"
+    echo "  to fetch and verify a fresh image from Canonical instead."
+    sha256sum "$CLOUDIMG" > "$CLOUDIMG_PIN"
   fi
 
   # convert it to format we can work with

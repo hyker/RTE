@@ -1,13 +1,45 @@
 #!/bin/bash
-# Script to add custodes payload to base image
-# Called from build-base.sh
-# Parameters: $1 = base image file path, $2 = debug mode (true/false), $3 = use TDX (true/false)
+# Script to add the custodes payload to a base image. Normally called from build-base.sh.
+#
+# Usage: ./add-payload.sh --image <path> [--debug] [--tdx]
+#        ./add-payload.sh <image> <debug true|false> [tdx true|false]   (legacy positional)
 
 set -e
 
-BASE_IMAGE="$1"
-DEBUG_MODE="$2"
-USE_TDX="${3:-false}"
+usage() {
+  echo "Usage: $0 --image <path> [--debug] [--tdx]"
+  echo "  --image <path>  base image to modify (required)"
+  echo "  --debug         build the payload for a debug image"
+  echo "  --tdx           include the TDX quote generator"
+  echo ""
+  echo "The legacy positional form '<image> <debug> <tdx>' is still accepted."
+}
+
+BASE_IMAGE=""
+DEBUG_MODE="false"
+USE_TDX="false"
+
+if [[ "$1" == --* ]]; then
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --image)  BASE_IMAGE="$2"; shift 2 ;;
+      --debug)  DEBUG_MODE=true; shift ;;
+      --tdx)    USE_TDX=true;    shift ;;
+      --help|-h) usage; exit 0 ;;
+      *)        echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+    esac
+  done
+else
+  BASE_IMAGE="$1"
+  DEBUG_MODE="${2:-false}"
+  USE_TDX="${3:-false}"
+fi
+
+if [ -z "$BASE_IMAGE" ]; then
+  echo "Error: no base image given." >&2
+  usage >&2
+  exit 1
+fi
 
 # Build custodes binary
 cd payload/custodes
@@ -15,14 +47,18 @@ make clean
 make build
 cd ../..
 
-# Build aeskeyfind from source
+# Build aeskeyfind from the pinned submodule. This used to fall back to cloning
+# github.com/makomk/aeskeyfind at an unpinned HEAD -- a different upstream from the
+# one .gitmodules declares -- which would have put unreviewed code into the attested
+# image. The submodule is the only accepted source; if it is missing, say so.
 if [ ! -f "payload/custodes/tools/aeskeyfind/aeskeyfind" ]; then
-  echo "Building aeskeyfind..."
-  mkdir -p payload/custodes/tools/aeskeyfind
-  cd payload/custodes/tools/aeskeyfind
-  if [ ! -f "aeskeyfind.c" ]; then
-    git clone https://github.com/makomk/aeskeyfind .
+  if [ ! -f "payload/custodes/tools/aeskeyfind/aeskeyfind.c" ]; then
+    echo "Error: payload/custodes/tools/aeskeyfind is empty." >&2
+    echo "  Run: git submodule update --init --recursive" >&2
+    exit 1
   fi
+  echo "Building aeskeyfind..."
+  cd payload/custodes/tools/aeskeyfind
   make clean
   make
   cd ../../../..
@@ -34,10 +70,25 @@ go build -o checksec .
 cd ../../../..
 
 # Download and extract dependency-check
+# The dependency-check release is normally vendored in the repo; this downloads it
+# only if that tree is absent. It lands in the attested image either way, so the
+# archive is pinned by digest. Upstream publishes no checksum file alongside the
+# release, so this digest was computed from the archive and verified to match the
+# vendored tree byte for byte.
+DC_VERSION="12.1.6"
+DC_SHA256="1d8a60e379099e33009d2d105daa9f52b27f4ac5dc1859a279c76fbc2096c2ed"
 if [ ! -d "payload/custodes/tools/dependency-check" ]; then
-  echo "Downloading dependency-check..."
+  echo "Downloading dependency-check ${DC_VERSION}..."
   cd payload/custodes/tools
-  curl -Ls "https://github.com/dependency-check/DependencyCheck/releases/download/v12.1.6/dependency-check-12.1.6-release.zip" -o dependency-check.zip
+  curl -Ls "https://github.com/dependency-check/DependencyCheck/releases/download/v${DC_VERSION}/dependency-check-${DC_VERSION}-release.zip" -o dependency-check.zip
+  ACTUAL_SHA=$(sha256sum dependency-check.zip | awk '{print $1}')
+  if [ "$ACTUAL_SHA" != "$DC_SHA256" ]; then
+    echo "Error: dependency-check archive checksum mismatch." >&2
+    echo "  expected: $DC_SHA256" >&2
+    echo "  actual:   $ACTUAL_SHA" >&2
+    rm -f dependency-check.zip
+    exit 1
+  fi
   unzip -q dependency-check.zip
   rm dependency-check.zip
   cd ../../..
