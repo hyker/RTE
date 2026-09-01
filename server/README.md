@@ -1,8 +1,17 @@
 # Verity Image Builder
 
 ## Purpose
-This repository contains scripts for building a bootable image with dm-verity enabeled to ensure that a file system was booted with integrity, ensuring that no alterations of data relative to a base image has happened.
-It is intended to be coupled with secure boot to protect the kernel etc.
+Scripts for building a bootable image whose root filesystem is dm-verity protected, so a verifier
+can establish that it booted from a known base image with no alterations.
+
+dm-verity alone covers only the root filesystem. The kernel, initrd and bootloader live on
+partitions outside it, so they are covered by the TDX measurement registers instead — see
+"Tamper proofing unprotected partitions" below, and the design section in the top-level README.
+
+**Secure Boot is required for that coverage to be complete.** `boot.sh` boots
+`/usr/share/ovmf/OVMF.tdx.fd`, the only local firmware carrying the Microsoft/Canonical
+certificates. Booting `OVMF.fd` instead disables Secure Boot, and the kernel then ends up
+measured into no register at all — see the top-level README for why.
 
 ## System Architecture
 
@@ -45,7 +54,7 @@ It is intended to be coupled with secure boot to protect the kernel etc.
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                         QEMU VM (boot.sh)                           │    │
 │  │  ┌─────────────────────────────────────────────────────────────┐   │    │
-│  │  │              ROOT FS (dm-verity protected, RO)              │   │    │
+│  │  │      ROOT FS (dm-verity lower + tmpfs overlay, see below)   │   │    │
 │  │  │  ┌─────────────────┐  ┌─────────────────────────────────┐  │   │    │
 │  │  │  │  Ubuntu 24.04   │  │        /opt/<payload>/          │  │   │    │
 │  │  │  │  Base System    │  │  ┌───────────────────────────┐  │  │   │    │
@@ -76,13 +85,13 @@ It is intended to be coupled with secure boot to protect the kernel etc.
 ### Component Overview
 
 **Build Scripts:**
-- **build-base.sh** - Creates base image from Ubuntu cloud image; configures dm-verity partitions, network, tmpfs mounts; calls add-payload.sh; outputs inspectable `base-image.raw`. The upstream base image (TDX qcow2 or plain Ubuntu cloud image) is downloaded/built once and cached locally — subsequent runs reuse the cached file, skipping the download and TDX image build steps. Because that cached file is a snapshot that ages, every build now runs an `apt-get dist-upgrade` over it first, so each image starts fully patched. This is the only way the kernel gets updated — a reboot returns the VM to this image, so runtime updates can never change it. When the upgrade does pull something in, the root hash and RTMR2 change, so re-record measurements and rebuild the client.
+- **build-base.sh** - Creates base image from Ubuntu cloud image; configures dm-verity partitions, network, tmpfs mounts; calls add-payload.sh; outputs inspectable `base-image.raw`. The upstream base image (TDX qcow2 or plain Ubuntu cloud image) is downloaded/built once and cached locally — subsequent runs reuse the cached file, skipping the download and TDX image build steps. Because that cached file is a snapshot that ages, every build now runs an `apt-get dist-upgrade` over it first, so each image starts fully patched. This is the only way the kernel gets updated — a reboot returns the VM to this image, so runtime updates can never change it. When the upgrade does pull something in, the root hash changes and so do the measurements — RTMR2 via the command line, and RTMR1 too if the kernel itself moved — so re-record and rebuild the client.
 - **add-payload.sh** - Compiles and installs payload service, tools, certificates, and systemd unit files into the image
 - **setup-verity.sh** - Calculates dm-verity root hash from base image, writes hash to grub.cfg, outputs bootable image (`verity-image.img` for staging, `verity-dev-image.img` with `--dev`)
 - **boot.sh** - Launches QEMU VM with port forwarding, optional TDX support, and overlay mode for development. Passes the Cloudflare API token to the VM at runtime via QEMU `fw_cfg` (read from `secrets.sh`, never touches the image)
 
 **Runtime Layers:**
-- **Root FS (RO)** - dm-verity protected; all binaries, configs, and service code; tamper-evident
+- **Root FS** - dm-verity protected lower layer (all binaries, configs and service code, tamper-evident) under a tmpfs overlay that makes it writable at runtime; a reboot discards the overlay
 - **Tmpfs (RW)** - Ephemeral writable directories for runtime data, logs, and transient processing
 - **TDX Quote Generator** - Optional C binary using Intel TDX attestation library for hardware-backed attestation
 
@@ -108,9 +117,8 @@ build-base.sh ──> setup-verity.sh ──> boot.sh
    ```bash
    LE_DOMAIN="yourdomain.example.com"
    LE_EMAIL="you@example.com"
-   LE_STAGING="true"   # use "false" for production certs
    ```
-   **Let's Encrypt rate limits:** Production LE enforces 5 duplicate certificates per week (rolling 7-day window) per hostname. Use `LE_STAGING="true"` during development — staging has no rate limits but produces untrusted certs. Switch to `"false"` only for actual deployments.
+   **Let's Encrypt rate limits:** production LE enforces 5 duplicate certificates per week (rolling 7-day window) per hostname. Staging certificates are untrusted but unlimited, and are selected automatically by `--dev`; `--prod` uses production LE. This is derived from the build mode (`build-base.sh`), not set here. Measurement-only boots cost no certificate at all — see `boot.sh --measure-only`.
 
 2. Create `secrets.sh` (gitignored — never committed):
    ```bash
@@ -162,41 +170,36 @@ Because MRTD and RTMR1 are now pinned, **upgrading the host's OVMF package or ch
 
 `record-rtmr2.sh` boots with `boot.sh --measure-only`, which passes a sentinel in place of the Cloudflare token so the guest serves a self-signed certificate and never contacts Let's Encrypt. Measurement boots therefore cost no certificate (LE allows only 5 duplicates per week).
 
-`boot.sh` reads `verity-image.img.meta` for VM configuration (TDX mode, RAM size). Image integrity is ensured at runtime by dm-verity (root filesystem) and by the pinned measurements above (MRTD, RTMR1 and RTMR2 covering firmware, bootloader and kernel/initrd/cmdline). The Cloudflare API token is passed to the VM via QEMU `fw_cfg` — never written to the image.
+`boot.sh` reads `verity-image.img.meta` for VM configuration (TDX mode, RAM size). Image integrity is ensured at runtime by dm-verity (root filesystem) and by the pinned measurements above: MRTD covers the firmware, RTMR1 the bootloader images and the kernel, RTMR2 the command line and initrd. The Cloudflare API token is passed to the VM via QEMU `fw_cfg` — never written to the image.
 
 ## Security model
 
-./build-base.sh takes a standard ubuntu server cloud image, makes alterations to it, and outputs an altered image: base-image.raw.
-This image is intended to be a public singleton base image that anbody can inspect to see that it is not maliciously built.
-This image has had all the modification needed for verity protection done, but has dummy verity parameters.
-Hence it is not bootable.
-It is also not deterministic in the sense that things such as time stamps will affect the file system of the image.
-It is however inspectable (how to do this is described below).
+The rationale for the two-step build, the fixed verity salt, and what the TDX measurement
+registers cover is in the **top-level README** ("Design choices, motivations and gotchas").
+This section covers only the mechanics.
 
-Given a trusted base-image.raw, one can run ./setup-verity.sh to make a bootable version: verity-image.img.
-This script replaces the dummy verity parameters wih the actual values needed.
-All runs of ./setup-verity.sh on the same base-image.raw will produce the same verity values and hence the same image. The salt used for the dm-verity hash tree is fixed (hardcoded in both `build-base.sh` and `setup-verity.sh`). This is intentional: a random salt would produce a different root hash on every `setup-verity.sh` run even from the same `base-image.raw`, breaking determinism. Each deployment of this project can use its own fixed salt — the value just needs to be consistent between the two scripts.
+`build-base.sh` turns a stock Ubuntu cloud image into `base-image.raw` — verity-ready but with
+dummy parameters, so not bootable. `setup-verity.sh` substitutes the real values to produce
+`verity-image.img`, deterministically: the same base image always yields the same root hash.
 
-The purpose of this two step process is to have a publically verifiable base, and a deterministic (in relation to the base image) bootable image with dm-verity enabled.
-
-The scripts in this repository protects the root filesystem from tampering as follows:
 ```
 Protected by dm-verity:
 - Partition 1: Root filesystem with entire OS (/, /usr, /etc, /var, etc.)
 - Partition 5: dm-verity hash tree for verifying partition 1
 
-Unprotected:
-- Partition 14: BIOS Boot - GRUB bootloader data 
-- Partition 15: EFI System - UEFI bootloaders 
-- Partition 16: Extended Boot - kernel, initramfs, grub.cfg (contains placeholder dm-verity hash that gets replaced by setup-verity.sh)
+Unprotected (covered by the TDX measurement registers instead):
+- Partition 14: BIOS Boot - GRUB bootloader data
+- Partition 15: EFI System - UEFI bootloaders
+- Partition 16: Extended Boot - kernel, initramfs, grub.cfg (contains a placeholder
+                dm-verity hash that setup-verity.sh replaces)
 ```
 
-It is probably also possible to make the build process of the base image deterministic in the future, which would spare us the two step process and the distribution of an altered inspectable image (though still dependent on the security of the base image from ubuntu).
+The verity root hash reaches the VM as a kernel command-line parameter and is checked by
+initramfs at boot, which is why the integrity of partitions 14–16 has to come from TDX (or a TPM)
+rather than from verity itself.
 
-## Tamper proofing unprotected partitions
-Since the verity hash is given to the VM as a boot parameter, and the integrity is checked by initramfs at boot, security requires that the integrity of partition 14, 15 and 16 is ensured by other means, e.g. by use of a TPM or TDX.
-
-When using TDX, verifying that RTMR2 matches the expected value (calculated from the image) combined with dm-verity ensures integrity of the entire service.
+Making the base-image build reproducible would remove the need for the two-step process and for
+distributing an inspectable intermediate — still subject to trusting Ubuntu's base image.
 
 ## How to inspect base image
 ```
@@ -216,18 +219,14 @@ rm -rf /tmp/base-image-mount
 
 ## Writable Directories
 
-The root filesystem sits on dm-verity, but it is no longer read-only at runtime: `overlayroot`
-puts a tmpfs overlay on top of it at boot, so apt and dpkg can write and the VM can apply
-Canonical security updates while it runs. The verity device underneath is never remounted
-read-write, so integrity checking of the lower layer is unaffected, and the upper layer is RAM
-that a reboot discards — a reboot returns the VM to the pristine attested image. What this does
-cost is guest-side immutability: root inside the guest can now write to `/usr` for the life of
-the boot. `/var/lib` and `/var/cache` used to be bare tmpfs, which hid `/var/lib/dpkg` and left
-apt inert; they now come from the overlay.
+`overlayroot` puts a tmpfs overlay over the dm-verity root at boot, so apt and dpkg can write.
+The verity device underneath is never remounted read-write. `/var/lib` and `/var/cache` used to be
+bare tmpfs, which hid `/var/lib/dpkg` and left apt inert; they now come from the overlay.
+Kernel and microcode are excluded from runtime updates in
+`/etc/apt/apt.conf.d/99zz-rte-unattended-upgrades`.
 
-Kernel and microcode are deliberately excluded from the runtime updates (see
-`/etc/apt/apt.conf.d/99zz-rte-unattended-upgrades`) — they only take effect on reboot, and a
-reboot returns to this image, so they are handled by the build-time `dist-upgrade` instead.
+**The security tradeoff this represents, and the two-tier update model, are in the top-level
+README** — read that before changing anything here.
 
 Writable paths still on their own tmpfs (defaults: ~12.3GB total):
 - `/tmp` (10G - payload storage), `/var/log` (256M), `/var/tmp` (2G - dependency-check database)
@@ -287,8 +286,8 @@ TOE files are automatically cleaned up to prevent `/var/tmp` from filling up:
 - **`/result` error responses** now include a `reason` field: `"processing_failed"` (tool execution failed), `"expired"` (cleaned up by sweeper), or `"not_found"` (job ID never existed or already downloaded).
 - **Upload disk-full:** If writing the TOE to disk fails (e.g. tmpfs full), the upload endpoint returns a JSON error with `"reason": "storage_failed"` and HTTP 500.
 
-**Read-only Adaptations:**
-- Binaries/configs: `/opt/custodes/` (read-only, dm-verity protected)
+**Adaptations for a non-writable base:**
+- Binaries/configs: `/opt/custodes/` (dm-verity protected; writable only via the runtime overlay, which a reboot discards)
 - Runtime data: `/var/tmp/custodes/` (tmpfs, writable)
 - dependency-check: Uses `--data /var/tmp/custodes/dependency-check-data` instead of default `/root/.m2/`
 - aeskeyfind: Built with `-O1 -fno-strict-aliasing` — upstream Makefile uses `-O4`, which triggers a GCC 13 strict-aliasing miscompilation that silently breaks key schedule detection
@@ -327,24 +326,23 @@ A verifier can confirm via the quote that result signatures belong to this speci
 
 **Test:**
 ```bash
-# dev VM (boot.sh --dev forwards host:9001 → guest:9000)
-curl -k https://localhost:9001/tools   # List tools
-curl -k https://localhost:9001/quote   # Generate TDX quote
-curl -k https://localhost:9001/rtmr2   # Get RTMR2 value
-
-# staging VM (boot.sh --staging forwards host:8444 → guest:9000)
-curl -k https://localhost:8444/tools
+# dev VM  (boot.sh --dev  forwards host:9444 → guest:9000)
+# prod VM (boot.sh --prod forwards host:8444 → guest:9000)
+curl -k https://localhost:9444/tools          # List tools
+curl -k https://localhost:9444/quote          # Generate TDX quote
+curl -k https://localhost:9444/measurements   # All pinned measurements
+curl -k https://localhost:9444/rtmr2          # RTMR2 alone
 ```
 
-`test-endpoints.sh` provides an automated smoke test hitting all four endpoints in sequence:
+`test-endpoints.sh` runs an automated smoke test over every endpoint:
 ```bash
-./test-endpoints.sh dev      # tests against port 9001
-./test-endpoints.sh staging  # tests against port 8444
+./test-endpoints.sh dev      # port 9444
+./test-endpoints.sh prod     # port 8444
 ```
 
 **Verifying RTMR2:**
 After verifying the image, obtain the expected RTMR2 value:
-- Infrastructure owners: `curl -k https://localhost:9001/rtmr2` (dev) or `curl -k https://localhost:8444/rtmr2` (staging)
+- Infrastructure owners: `curl -k https://localhost:9444/rtmr2` (dev) or `curl -k https://localhost:8444/rtmr2` (prod)
 - Third-party verifiers: use [tdx-measure](https://github.com/virtee/tdx-measure) to calculate RTMR values directly from the image
 
 ## Planned Tools
@@ -389,9 +387,9 @@ All tools must run entirely within the RTE — no sending data to external servi
 
 * **Non-TDX builds are currently broken.** The build pipeline and custodes service assume TDX hardware is available (quote generator, RTMR2 recording). Builds without `--tdx` will fail at the RTMR2 recording step and the service may not start correctly. Use `--tdx` on TDX-capable hardware for now.
 
-## Notes about current state and next steps
+## Possible improvements
 
- * Make debug version note that very clearly (in output? or some other fashion)
- * move "add payload" scrtipt into function of build base instead.
- * move different parts of build base into separate functions
- * ~~**Custodes TOE cleanup:** Done. See "TOE Cleanup" section below.~~
+* Make `--debug` builds announce themselves unmistakably at runtime, not just at build time.
+* Fold `add-payload.sh` into `build-base.sh` as a function, and split `build-base.sh` itself into
+  functions — it is long and linear.
+* Make the base-image build reproducible, which would remove the two-step build entirely.
