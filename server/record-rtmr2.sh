@@ -14,14 +14,25 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-MODE="prod"
+MODE=""
+usage() {
+  echo "Usage: $0 <--prod|--dev>"
+  echo "  Boots the image measure-only, records MRTD/RTMR0/RTMR1/RTMR2 into its .meta file."
+  echo "  Mode may be given as '--dev'/'--prod' or 'dev'/'prod'. There is no default."
+}
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --prod) MODE="prod"; shift ;;
-    --dev)  MODE="dev";  shift ;;
-    *) echo "Usage: $0 [--prod|--dev]"; exit 1 ;;
+  case ${1#--} in
+    prod)   MODE="prod"; shift ;;
+    dev)    MODE="dev";  shift ;;
+    help|h) usage; exit 0 ;;
+    *)      usage >&2; exit 1 ;;
   esac
 done
+
+if [ -z "$MODE" ]; then
+  usage >&2
+  exit 1
+fi
 
 case $MODE in
   prod) META="verity-image.img.meta";     PORT=8444; VM_NAME="verity-prod" ;;

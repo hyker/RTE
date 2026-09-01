@@ -5,19 +5,22 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 MODE=""
+usage() {
+  echo "Usage: $0 <--prod|--dev>"
+  echo "  Boots the client hosting VM (prod: 8445, dev: 9445)."
+  echo "  Mode may be given as '--dev'/'--prod' or 'dev'/'prod'. There is no default."
+}
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --prod) MODE="prod"; shift ;;
-    --dev)  MODE="dev";  shift ;;
-    *)
-      echo "Usage: $0 --prod|--dev"
-      exit 1
-      ;;
+  case ${1#--} in
+    prod)   MODE="prod"; shift ;;
+    dev)    MODE="dev";  shift ;;
+    help|h) usage; exit 0 ;;
+    *)      usage >&2; exit 1 ;;
   esac
 done
 
 if [ -z "$MODE" ]; then
-  echo "Usage: $0 --prod|--dev"
+  usage >&2
   exit 1
 fi
 

@@ -10,25 +10,29 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 MODE=""
 TDX_FLAG=""
 DEBUG_FLAG=""
+usage() {
+  echo "Usage: $0 <--prod|--dev> [--tdx] [--debug]"
+  echo "  --prod   Build production image"
+  echo "  --dev    Build dev image"
+  echo "  --tdx    Enable TDX attestation support (required for measurement recording)"
+  echo "  --debug  Keep SSH and console login in the image (never for production)"
+  echo ""
+  echo "Mode may be given as '--dev'/'--prod' or 'dev'/'prod'. There is no default."
+}
+
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --prod)  MODE="prod";          shift ;;
-    --dev)   MODE="dev";           shift ;;
-    --tdx)   TDX_FLAG="--tdx";    shift ;;
-    --debug) DEBUG_FLAG="--debug"; shift ;;
-    *)
-      echo "Usage: $0 --prod|--dev [--tdx] [--debug]"
-      echo "  --prod   Build production image"
-      echo "  --dev    Build dev image"
-      echo "  --tdx    Enable TDX attestation support (required for RTMR2 recording)"
-      echo "  --debug  Enable debug mode (SSH access)"
-      exit 1
-      ;;
+  case ${1#--} in
+    prod)   MODE="prod";           shift ;;
+    dev)    MODE="dev";            shift ;;
+    tdx)    TDX_FLAG="--tdx";      shift ;;
+    debug)  DEBUG_FLAG="--debug";  shift ;;
+    help|h) usage; exit 0 ;;
+    *)      usage >&2; exit 1 ;;
   esac
 done
 
 if [ -z "$MODE" ]; then
-  echo "Usage: $0 --prod|--dev [--tdx] [--debug]"
+  usage >&2
   exit 1
 fi
 

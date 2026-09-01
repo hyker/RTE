@@ -3,28 +3,39 @@
 MODE=""
 MEASURE_ONLY=false
 
+usage() {
+  echo "Usage: $0 <--prod|--dev> [--measure-only]"
+  echo "  --prod: Port 8444, SSH 2222 (production image)"
+  echo "  --dev:  Port 9444, SSH 2223 (dev overlay image)"
+  echo "  --measure-only: skip Let's Encrypt, serve a self-signed cert."
+  echo "                  For reading measurements without spending a"
+  echo "                  certificate (LE allows 5 duplicates per week)."
+  echo ""
+  echo "  SSH ports only respond on images built with --debug."
+  echo "  Mode may be given as '--dev'/'--prod' or 'dev'/'prod'. There is no default."
+}
+
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --prod)
+  case ${1#--} in
+    prod)
       MODE="prod"
       shift
       ;;
-    --dev)
+    dev)
       MODE="dev"
       shift
       ;;
-    --measure-only)
+    measure-only)
       MEASURE_ONLY=true
       shift
       ;;
+    help|h)
+      usage
+      exit 0
+      ;;
     *)
-      echo "Unknown option: $1"
-      echo "Usage: $0 --prod|--dev [--measure-only]"
-      echo "  --prod: Port 8444, SSH 2222 (production image)"
-      echo "  --dev:  Port 9444, SSH 2223 (dev overlay image)"
-      echo "  --measure-only: skip Let's Encrypt, serve a self-signed cert."
-      echo "                  For reading measurements without spending a"
-      echo "                  certificate (LE allows 5 duplicates per week)."
+      echo "Unknown option: $1" >&2
+      usage >&2
       exit 1
       ;;
   esac

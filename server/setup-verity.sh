@@ -2,26 +2,27 @@
 set -e
 
 # Parse arguments
-MODE="dev"
+MODE=""
+usage() {
+  echo "Usage: $0 <--prod|--dev>"
+  echo "  --prod: write verity-image.img"
+  echo "  --dev:  write verity-dev-image.img"
+  echo ""
+  echo "Mode may be given as '--dev'/'--prod' or 'dev'/'prod'. There is no default."
+}
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --prod)
-      MODE="prod"
-      shift
-      ;;
-    --dev)
-      MODE="dev"
-      shift
-      ;;
-    *)
-      echo "Unknown option: $1"
-      echo "Usage: $0 [--prod|--dev]"
-      echo "  --prod: write verity-image.img"
-      echo "  --dev:  write verity-dev-image.img (default)"
-      exit 1
-      ;;
+  case ${1#--} in
+    prod)   MODE="prod"; shift ;;
+    dev)    MODE="dev";  shift ;;
+    help|h) usage; exit 0 ;;
+    *)      echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
+
+if [ -z "$MODE" ]; then
+  usage >&2
+  exit 1
+fi
 
 if [ "$MODE" = "prod" ]; then
   OUTPUT_IMAGE="verity-image.img"

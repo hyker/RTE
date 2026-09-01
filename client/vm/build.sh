@@ -6,25 +6,34 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$SCRIPT_DIR"
 
 MODE=""
+usage() {
+  echo "Usage: $0 <--prod|--dev>"
+  echo "  Builds the client bundle and the hosting VM artifacts."
+  echo "  Mode may be given as '--dev'/'--prod' or 'dev'/'prod'. There is no default."
+}
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --prod) MODE="prod"; shift ;;
-    --dev)  MODE="dev";  shift ;;
-    *)
-      echo "Usage: $0 --prod|--dev"
-      exit 1
-      ;;
+  case ${1#--} in
+    prod)   MODE="prod"; shift ;;
+    dev)    MODE="dev";  shift ;;
+    help|h) usage; exit 0 ;;
+    *)      usage >&2; exit 1 ;;
   esac
 done
 
 if [ -z "$MODE" ]; then
-  echo "Usage: $0 --prod|--dev"
+  usage >&2
   exit 1
 fi
 
 # --- Let's Encrypt via Cloudflare DNS-01 ---
-DOMAIN="rteverif.xyz"
-LE_EMAIL="joakim.brorsson@hyker.se"
+# DOMAIN and LE_EMAIL live in build-config.sh (tracked, no secrets), mirroring
+# server/build-config.sh. CF_API_TOKEN comes from secrets.sh (untracked).
+if [ ! -f "$SCRIPT_DIR/build-config.sh" ]; then
+  echo "Error: vm/build-config.sh not found. Create it with DOMAIN and LE_EMAIL."
+  exit 1
+fi
+# shellcheck source=build-config.sh
+source "$SCRIPT_DIR/build-config.sh"
 
 case $MODE in
   prod)

@@ -4,15 +4,24 @@
 #
 # Requires Node.js 18+ (for crypto.subtle ECIES encryption)
 
-if [ -z "$1" ]; then
+usage() {
   echo "Usage: $0 <dev|prod>"
+  echo "  Smoke-tests the custodes endpoints of a running VM (dev: 9444, prod: 8444)."
+  echo "  Mode may be given as 'dev'/'prod' or '--dev'/'--prod'."
+  echo "  Requires Node.js 18+."
+}
+
+if [ -z "$1" ]; then
+  usage >&2
   exit 1
 fi
 
-case $1 in
-  dev)  PORT=9444 ;;
-  prod) PORT=8444 ;;
-  *)    echo "Usage: $0 <dev|prod>"; exit 1 ;;
+MODE="${1#--}"
+case $MODE in
+  dev)     PORT=9444 ;;
+  prod)    PORT=8444 ;;
+  help|h)  usage; exit 0 ;;
+  *)       usage >&2; exit 1 ;;
 esac
 
 BASE_URL="https://localhost:$PORT"
@@ -27,7 +36,7 @@ FAILED=0
 pass() { echo "  PASS: $1"; }
 fail() { echo "  FAIL: $1"; FAILED=1; }
 
-echo "Testing custodes endpoints ($1 - port $PORT)"
+echo "Testing custodes endpoints ($MODE - port $PORT)"
 echo "========================================="
 
 # Test /tools
@@ -47,6 +56,16 @@ if echo "$TOOLS" | grep -q '"tool_name":"aeskeyfind"'; then
   pass "lists aeskeyfind"
 else
   fail "aeskeyfind not found in response"
+fi
+if echo "$TOOLS" | grep -q '"tool_name":"checksec"'; then
+  pass "lists checksec"
+else
+  fail "checksec not found in response"
+fi
+if echo "$TOOLS" | grep -q '"tool_name":"dependency-check"'; then
+  pass "lists dependency-check"
+else
+  fail "dependency-check not found in response"
 fi
 
 # Test /quote
@@ -73,7 +92,7 @@ fi
 # compared -- it is warn-only in the verifier because it churns with the QEMU/OVMF
 # version, and it legitimately differs on a boot that adds a serial device.
 echo "--- /measurements ---"
-case $1 in
+case $MODE in
   dev)  META="$SCRIPT_DIR/verity-dev-image.img.meta" ;;
   prod) META="$SCRIPT_DIR/verity-image.img.meta" ;;
 esac
