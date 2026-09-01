@@ -530,12 +530,15 @@ async function checkSignature(signature) {
       return new Error("PCK CRL is not available");
     }
 
-    // Check if the PCK certificate is revoked
-    const isRevoked = crl.revokedCertificates?.some(revokedCert => {
-      const pckCertSerialNumber = pckCert.serialNumber.valueBlock.valueHexView;
-      const revokedSerialNumber = revokedCert.userCertificate.valueBlock.valueHexView;
-      return revokedSerialNumber === pckCertSerialNumber;
-    });
+    // Check if the PCK certificate is revoked.
+    //
+    // These are Uint8Array views, so they must be compared by content. A `===`
+    // here compares references and is always false, which silently disabled this
+    // check entirely -- a revoked PCK certificate passed verification.
+    const pckCertSerialNumber = pckCert.serialNumber.valueBlock.valueHexView;
+    const isRevoked = crl.revokedCertificates?.some(revokedCert =>
+      eqByteArr(revokedCert.userCertificate.valueBlock.valueHexView, pckCertSerialNumber)
+    );
 
     if (isRevoked) {
       return new Error("PCK certificate is revoked");
