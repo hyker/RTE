@@ -226,13 +226,9 @@ SALT="eeafe117234ef8295fbed9aa846b45efabe53f2af502342cf50ca3ec709edf7d"
 # sed near the end of this script. The verity root still mounts read-only either way,
 # because initramfs-tools defaults to readonly=y (/usr/share/initramfs-tools/init:73)
 # and nothing puts 'rw' on the cmdline.
-# add login and ssh for debug, configure network, and prepare for dm-verity
+# configure network and prepare for dm-verity. Interactive login is NOT set up here --
+# see the --debug block below, and the purge in the non-debug block near the end.
 sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a base-working.raw --root-password "password:$ROOT_PASSWORD" \
-  --run-command "sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config" \
-  --run-command "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config" \
-  --run-command "rm -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf" \
-  --run-command "ssh-keygen -A" \
-  --run-command "systemctl enable ssh" \
   --run-command "mkdir -p /etc/netplan" \
   --run-command "cat > /etc/netplan/01-netcfg.yaml <<EOF
 network:
@@ -314,16 +310,40 @@ APTEOF"
 # Payload installation (see add-payload.sh)
 ./add-payload.sh base-working.raw "$DEBUG_MODE" "$USE_TDX"
 
-# Conditionally mask services based on debug mode
-if [ "$DEBUG_MODE" = false ]; then
+# Interactive login: enabled only for --debug, removed outright otherwise.
+#
+# The base qcow2 from Canonical's guest tools ships a 'tdx' account (uid 1000, /bin/bash,
+# in group sudo, NOPASSWD:ALL via /etc/sudoers.d/90-cloud-init-users) whose password is the
+# literal '123456' -- see setup-tdx-config-custom:73-74. Masking ssh.service was the only
+# thing standing between that account and a login, and masking is guest-side state on a
+# root that Step 3 made writable at runtime. So a non-debug image deletes the account and
+# the server rather than relying on the mask.
+if [ "$DEBUG_MODE" = true ]; then
   sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a base-working.raw \
-    --run-command "systemctl mask ssh.service" \
+    --run-command "sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config" \
+    --run-command "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config" \
+    --run-command "rm -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf" \
+    --run-command "ssh-keygen -A" \
+    --run-command "systemctl enable ssh"
+else
+  sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a base-working.raw \
+    --run-command "DEBIAN_FRONTEND=noninteractive apt-get purge --yes openssh-server openssh-sftp-server ssh-import-id" \
+    --run-command "rm -rf /etc/ssh /root/.ssh" \
+    --run-command "userdel -r tdx || true" \
+    --run-command "rm -f /etc/sudoers.d/90-cloud-init-users" \
+    --run-command "passwd -l root" \
     --run-command "systemctl mask systemd-logind.service" \
-    --run-command "systemctl mask multipathd.service" \
+    --run-command "systemctl mask multipathd.service multipathd.socket" \
     --run-command "systemctl mask ModemManager.service" \
     --run-command "systemctl mask rsyslog.service" \
-    --run-command "passwd -l root" \
     --run-command "systemctl mask getty@.service serial-getty@.service"
+
+  # Fail the build rather than ship an image that still has a way in. Each of these was
+  # true of every image before 2026-09-01.
+  sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a base-working.raw \
+    --run-command "if [ -e /usr/sbin/sshd ]; then echo 'ERROR: sshd still present'; exit 1; fi" \
+    --run-command "if getent passwd tdx; then echo 'ERROR: tdx account still present'; exit 1; fi" \
+    --run-command "if awk -F: '\$3 >= 1000 && \$3 < 65534 { print; found=1 } END { exit !found }' /etc/passwd; then echo 'ERROR: interactive account still present'; exit 1; fi"
 fi
 
 # Canonical's TDX setup pins a specific kernel: setup-tdx-common:80-90 writes

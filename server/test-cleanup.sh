@@ -1,7 +1,8 @@
 #!/bin/bash
 # Test TOE cleanup behavior.
 # Prerequisites:
-#   - Dev VM booted with --dev (SSH on port 2223)
+#   - Dev VM built with --dev --debug and booted with --dev (SSH on port 2223).
+#     Non-debug images have no sshd at all, so this script cannot reach them.
 #   - custodes built with test timing (MaxTOEAge=30s, sweepInterval=10s)
 #
 # Usage: ./test-cleanup.sh <password> [ssh-port]

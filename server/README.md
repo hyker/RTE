@@ -250,14 +250,25 @@ Required RAM = total tmpfs + 2GB overhead. Default: ~16.3GB (12.3GB of tmpfs mou
 - `sysstat.service` - System statistics
 - `systemd-remount-fs.service` - Conflicts with dm-verity read-only root
 
-**Disabled in production mode only** (enabled with `--debug`):
-- `ssh.service` - SSH server
+**Masked in production mode only** (left running with `--debug`):
 - `systemd-logind.service` - Login session management
-- `multipathd.service` - Multipath device mapper
+- `multipathd.service` / `multipathd.socket` - Multipath device mapper
 - `ModemManager.service` - Modem manager
 - `rsyslog.service` - System logging daemon
 - `getty@.service` / `serial-getty@.service` - Console login prompts (TTY and serial)
-- Root account is locked (`passwd -l root`), making console login impossible even if getty were running. Verifiable: `grep root /etc/shadow` shows `root:!$...`
+
+**Removed in production mode only** (kept with `--debug`):
+- `openssh-server` is purged outright, along with `/etc/ssh`. Masking `ssh.service` used to be
+  the only thing preventing login, and a mask is guest-side state on a root that is writable at
+  runtime — so the server is deleted rather than disabled.
+- The `tdx` account (uid 1000, `/bin/bash`, group `sudo`, password `123456`) that Canonical's
+  guest tools bake into the base qcow2, together with its `NOPASSWD:ALL` rule in
+  `/etc/sudoers.d/90-cloud-init-users`.
+- `PermitRootLogin`/`PasswordAuthentication` are only set to `yes` in `--debug` builds; they used
+  to be set unconditionally.
+
+`build-base.sh` asserts all three at the end of a non-debug build and fails rather than ship an
+image with a way in.
 
 In `--debug` builds the builder is interactively prompted for a root password at build time (used for SSH access). In production builds a random password is generated and immediately discarded — the account is then locked with `passwd -l`, making the password irrelevant.
 
