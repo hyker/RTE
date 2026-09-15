@@ -86,10 +86,17 @@ func rtmr2Handler(w http.ResponseWriter, r *http.Request) {
 //
 //	mrTd         TDVF firmware code                    — pinned, hard fail
 //	rtmr0        TDVF config, boot vars, ACPI          — pinned, warning only
-//	rtmr1        shim + grubx64.efi + GPT              — pinned, hard fail
-//	rtmr2        cmdline / kernel / initrd             — pinned, hard fail
+//	rtmr1        shim + grubx64.efi + kernel + GPT     — pinned, hard fail
+//	rtmr2        MokList + cmdline + initrd            — pinned, hard fail
 //	rtmr3        nothing should extend it              — must be all zeros
 //	tdAttributes carries the TD debug bit              — must have debug clear
+//
+// The kernel is in rtmr1, not rtmr2: under Secure Boot GRUB chain-loads it through
+// firmware LoadImage, which emits an image-load event. /boot is partition 16, outside
+// the dm-verity root, so rtmr1 is the only register covering the kernel binary.
+//
+// How these contents were established, and why the event log's index field is a flat
+// map rather than the ranged UEFI table: see the Appendix in the top-level README.
 func measurementsHandler(w http.ResponseWriter, r *http.Request) {
 	quoteBytes, err := getQuoteBytes()
 	if err != nil {

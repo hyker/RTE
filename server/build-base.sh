@@ -212,7 +212,27 @@ sgdisk -e base-working.raw
 sgdisk -p base-working.raw
 
 # Create verity hash partition (partition 5) - uses remaining space (128M)
-sgdisk -n 5:0:0 -t 5:8300 -c 5:"verity-hash" base-working.raw
+#
+# -u pins the partition's unique GUID. Without it sgdisk generates a random one per run,
+# and that GUID is measured: the GPT goes into RTMR1, so RTMR1 came out different on every
+# build even when the boot chain was byte-identical.
+#
+# This is hygiene, not a security fix, and it changes nothing about what attestation
+# guarantees. The trust model (README, "Why the build has two steps") anchors on
+# base-image.raw as a public, inspectable artifact from which the measurements are
+# mechanically recomputable -- and the random GUID was baked into base-image.raw, so
+# RTMR1 was already deterministic for anyone holding that image.
+#
+# What pinning buys is signal. RTMR1 covers the GPT, shim, GRUB and the kernel, and /boot
+# is partition 16, outside the dm-verity root, so RTMR1 is the only register covering the
+# kernel binary (see the Secure Boot rationale in boot.sh). While it churned every build,
+# a real change to the boot chain was indistinguishable from GUID noise; now RTMR1 moves
+# only when the boot chain moves.
+#
+# The value is arbitrary but must never change; it is the GUID builds already produced
+# before this was pinned. Every other GPT GUID (disk, p1, p14, p15, p16) comes from
+# Canonical's cloud image and was verified stable across builds.
+sgdisk -n 5:0:0 -t 5:8300 -c 5:"verity-hash" -u 5:40EE0CCB-AA6F-4B84-AE47-B62C00B1C64B base-working.raw
 
 # Placeholder values for dm-verity (will be replaced in grub.cfg by setup-verity.sh)
 PLACEHOLDER_HASH="0000000000000000000000000000000000000000000000000000000000000000"
@@ -358,7 +378,8 @@ fi
 # (grub.d is sourced in lexical order, last assignment wins), hence 99-zz-.
 # Determinism matters here beyond the upgrade: under GRUB_DEFAULT=saved, which kernel
 # boots is a function of leftover grubenv state rather than of the image -- and the
-# kernel is measured into RTMR2.
+# kernel is measured into RTMR1 (GRUB chain-loads it through LoadImage under Secure Boot;
+# the cmdline and initrd are what land in RTMR2).
 sudo LIBGUESTFS_BACKEND=direct virt-customize --format=raw -a base-working.raw \
   --run-command "mkdir -p /etc/default/grub.d" \
   --run-command "printf 'GRUB_DEFAULT=0\nGRUB_SAVEDEFAULT=false\n' > /etc/default/grub.d/99-zz-rte-boot.cfg" \
