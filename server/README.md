@@ -267,8 +267,10 @@ Required RAM = total tmpfs + 2GB overhead. Default: ~16.3GB (12.3GB of tmpfs mou
 - `PermitRootLogin`/`PasswordAuthentication` are only set to `yes` in `--debug` builds; they used
   to be set unconditionally.
 
-`build-base.sh` asserts all three at the end of a non-debug build and fails rather than ship an
-image with a way in.
+At the end of a non-debug build `build-base.sh` asserts that no `sshd` binary, no `tdx` account
+and no interactive account at all (uid 1000–65533) remain, and fails rather than ship an image
+with a way in. The sshd config lines above are not asserted separately — with the server purged
+there is nothing left to read them.
 
 In `--debug` builds the builder is interactively prompted for a root password at build time (used for SSH access). In production builds a random password is generated and immediately discarded — the account is then locked with `passwd -l`, making the password irrelevant.
 
